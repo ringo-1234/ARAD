@@ -61,6 +61,7 @@ public final class AutoDriveController {
     private static final double ARRIVE_DIST_OUT = 3.2;
     private static final float ARRIVE_SPEED_IN = 0.03f;
     private static final float ARRIVE_SPEED_OUT = 0.05f;
+    private static final double STATION_CAPTURE_DIST = ARRIVE_DIST_OUT + 1.2;
     private static final double STOP_BUFFER = 0.35;
     private static final double BRAKE_HYSTERESIS = 6.0;
     private static final double PHASE_MARGIN = 1.15;
@@ -330,6 +331,8 @@ public final class AutoDriveController {
             forwardDistSt = distToTarget;
             boolean isStoppedAtStation = (speed < 0.01f && distToTarget < 3.0);
             boolean inArrivalBand = (forwardDistSt >= -0.5 && forwardDistSt <= ARRIVE_DIST_IN && speed <= ARRIVE_SPEED_IN);
+            boolean inArrivalOuterBand = (forwardDistSt >= -0.5 && forwardDistSt <= ARRIVE_DIST_OUT && speed <= ARRIVE_SPEED_OUT);
+            if (inArrivalOuterBand) arrivalLatched = true;
             if (inArrivalBand) arriveConfirmTicks += dt;
             else arriveConfirmTicks = 0;
             if (arrivalLatched || (inArrivalBand && arriveConfirmTicks >= ARRIVE_CONFIRM_TICKS) || isStoppedAtStation) {
@@ -373,9 +376,24 @@ public final class AutoDriveController {
         boolean shouldBrake = (state == DriveState.BRAKING)
                 ? (effectiveDist < brakePhaseStart + BRAKE_HYSTERESIS)
                 : (effectiveDist < brakePhaseStart);
+        if (!shouldBrake
+                && targetSnap != null
+                && forwardDistSt >= 0.0
+                && forwardDistSt <= STATION_CAPTURE_DIST
+                && speed > ARRIVE_SPEED_IN) {
+            shouldBrake = true;
+        }
         if (shouldBrake) {
             state = DriveState.BRAKING;
-            setTarget(calcStopNotch(effectiveDist, speed, decel));
+            int stopNotch = calcStopNotch(effectiveDist, speed, decel);
+            if (targetSnap != null && forwardDistSt >= 0.0 && forwardDistSt <= STATION_CAPTURE_DIST) {
+                if (speed > ARRIVE_SPEED_OUT) {
+                    stopNotch = Math.min(stopNotch, -2);
+                } else if (speed > ARRIVE_SPEED_IN) {
+                    stopNotch = Math.min(stopNotch, -1);
+                }
+            }
+            setTarget(stopNotch);
             return;
         }
 
