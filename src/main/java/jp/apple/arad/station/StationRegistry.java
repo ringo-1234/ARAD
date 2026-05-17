@@ -18,6 +18,7 @@ public final class StationRegistry {
         loadedStationMap.put(te.getStationId(), te);
         StationSnapshot snapshot = toSnapshot(te);
         if (snapshot != null) {
+            purgeStaleSnapshotsAtSamePos(te.getWorld(), snapshot);
             stationCache.put(snapshot.id, snapshot);
             if (te.getWorld() != null && !te.getWorld().isRemote) {
                 StationCacheStore.get(te.getWorld()).upsert(snapshot);
@@ -51,16 +52,15 @@ public final class StationRegistry {
     }
 
     public void removeFromCacheByPos(World world, int dim, int x, int z) {
-        float tx = (float) (x + 0.5);
-        float tz = (float) (z + 0.5);
-        String removeId = null;
+        List<String> removeIds = new ArrayList<>();
         for (StationSnapshot s : stationCache.values()) {
             if (s.dim != dim) continue;
-            if (Math.abs(s.x - tx) > 0.01f || Math.abs(s.z - tz) > 0.01f) continue;
-            removeId = s.id;
-            break;
+            if (toBlockCoord(s.x) != x || toBlockCoord(s.z) != z) continue;
+            removeIds.add(s.id);
         }
-        if (removeId != null) removeFromCache(world, removeId);
+        for (String id : removeIds) {
+            removeFromCache(world, id);
+        }
     }
 
     public void removeFromCacheByPos(int dim, int x, int z) {
@@ -113,5 +113,27 @@ public final class StationRegistry {
                 te.isSpawnReversed(),
                 te.getDwellTimeTicks()
         );
+    }
+    private void purgeStaleSnapshotsAtSamePos(World world, StationSnapshot snapshot) {
+        int bx = toBlockCoord(snapshot.x);
+        int bz = toBlockCoord(snapshot.z);
+        List<String> staleIds = new ArrayList<>();
+        for (StationSnapshot s : stationCache.values()) {
+            if (s.id.equals(snapshot.id)) continue;
+            if (s.dim != snapshot.dim) continue;
+            if (toBlockCoord(s.x) != bx || toBlockCoord(s.z) != bz) continue;
+            staleIds.add(s.id);
+        }
+        for (String staleId : staleIds) {
+            loadedStationMap.remove(staleId);
+            stationCache.remove(staleId);
+            if (world != null && !world.isRemote) {
+                StationCacheStore.get(world).remove(staleId);
+            }
+        }
+    }
+
+    private static int toBlockCoord(float centerCoord) {
+        return (int) Math.floor(centerCoord);
     }
 }

@@ -99,7 +99,6 @@ public final class CommonAradEventHandler {
             TileEntity te = world.getTileEntity(event.getPos());
             if (te instanceof TileEntityStation) {
                 StationRegistry.INSTANCE.removeFromCache(world, ((TileEntityStation) te).getStationId());
-            } else {
                 StationRegistry.INSTANCE.removeFromCacheByPos(
                         world,
                         world.provider.getDimension(),
