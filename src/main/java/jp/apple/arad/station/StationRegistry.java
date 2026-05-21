@@ -11,10 +11,31 @@ public final class StationRegistry {
     private final Map<String, TileEntityStation> loadedStationMap = new LinkedHashMap<>();
     private final Map<String, StationSnapshot> stationCache = new LinkedHashMap<>();
 
-    private StationRegistry() {}
+    private StationRegistry() {
+    }
 
-    public void register(TileEntityStation te)  {
-        if (te == null) return;
+    private static StationSnapshot toSnapshot(TileEntityStation te) {
+        if (te.getWorld() == null)
+            return null;
+        return new StationSnapshot(
+                te.getStationId(),
+                te.getStationName(),
+                (float) (te.getPos().getX() + 0.5),
+                (float) (te.getPos().getZ() + 0.5),
+                te.getWorld().provider.getDimension(),
+                te.isDoorLeft(),
+                te.isDoorRight(),
+                te.isSpawnReversed(),
+                te.getDwellTimeTicks());
+    }
+
+    private static int toBlockCoord(float centerCoord) {
+        return (int) Math.floor(centerCoord);
+    }
+
+    public void register(TileEntityStation te) {
+        if (te == null)
+            return;
         loadedStationMap.put(te.getStationId(), te);
         StationSnapshot snapshot = toSnapshot(te);
         if (snapshot != null) {
@@ -25,11 +46,15 @@ public final class StationRegistry {
             }
         }
     }
-    public void unregister(String stationId)    { loadedStationMap.remove(stationId); }
+
+    public void unregister(String stationId) {
+        loadedStationMap.remove(stationId);
+    }
 
     public void loadFromWorld(World world) {
         stationCache.clear();
-        if (world == null || world.isRemote) return;
+        if (world == null || world.isRemote)
+            return;
         for (StationSnapshot s : StationCacheStore.get(world).getAllSnapshots()) {
             stationCache.put(s.id, s);
         }
@@ -54,8 +79,10 @@ public final class StationRegistry {
     public void removeFromCacheByPos(World world, int dim, int x, int z) {
         List<String> removeIds = new ArrayList<>();
         for (StationSnapshot s : stationCache.values()) {
-            if (s.dim != dim) continue;
-            if (toBlockCoord(s.x) != x || toBlockCoord(s.z) != z) continue;
+            if (s.dim != dim)
+                continue;
+            if (toBlockCoord(s.x) != x || toBlockCoord(s.z) != z)
+                continue;
             removeIds.add(s.id);
         }
         for (String id : removeIds) {
@@ -76,7 +103,9 @@ public final class StationRegistry {
         return Collections.unmodifiableCollection(loadedStationMap.values());
     }
 
-    public TileEntityStation get(String stationId) { return loadedStationMap.get(stationId); }
+    public TileEntityStation get(String stationId) {
+        return loadedStationMap.get(stationId);
+    }
 
     public StationSnapshot getSnapshot(String stationId) {
         return stationCache.get(stationId);
@@ -90,38 +119,32 @@ public final class StationRegistry {
         TileEntityStation nearest = null;
         double best = maxDist * maxDist;
         for (TileEntityStation te : loadedStationMap.values()) {
-            if (te.getWorld() == null) continue;
-            if (te.getWorld().provider.getDimension() != dim) continue;
+            if (te.getWorld() == null)
+                continue;
+            if (te.getWorld().provider.getDimension() != dim)
+                continue;
             double dx = te.getPos().getX() + 0.5 - x;
             double dz = te.getPos().getZ() + 0.5 - z;
             double d2 = dx * dx + dz * dz;
-            if (d2 < best) { best = d2; nearest = te; }
+            if (d2 < best) {
+                best = d2;
+                nearest = te;
+            }
         }
         return nearest;
     }
 
-    private static StationSnapshot toSnapshot(TileEntityStation te) {
-        if (te.getWorld() == null) return null;
-        return new StationSnapshot(
-                te.getStationId(),
-                te.getStationName(),
-                (float) (te.getPos().getX() + 0.5),
-                (float) (te.getPos().getZ() + 0.5),
-                te.getWorld().provider.getDimension(),
-                te.isDoorLeft(),
-                te.isDoorRight(),
-                te.isSpawnReversed(),
-                te.getDwellTimeTicks()
-        );
-    }
     private void purgeStaleSnapshotsAtSamePos(World world, StationSnapshot snapshot) {
         int bx = toBlockCoord(snapshot.x);
         int bz = toBlockCoord(snapshot.z);
         List<String> staleIds = new ArrayList<>();
         for (StationSnapshot s : stationCache.values()) {
-            if (s.id.equals(snapshot.id)) continue;
-            if (s.dim != snapshot.dim) continue;
-            if (toBlockCoord(s.x) != bx || toBlockCoord(s.z) != bz) continue;
+            if (s.id.equals(snapshot.id))
+                continue;
+            if (s.dim != snapshot.dim)
+                continue;
+            if (toBlockCoord(s.x) != bx || toBlockCoord(s.z) != bz)
+                continue;
             staleIds.add(s.id);
         }
         for (String staleId : staleIds) {
@@ -131,9 +154,5 @@ public final class StationRegistry {
                 StationCacheStore.get(world).remove(staleId);
             }
         }
-    }
-
-    private static int toBlockCoord(float centerCoord) {
-        return (int) Math.floor(centerCoord);
     }
 }

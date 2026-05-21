@@ -62,7 +62,8 @@ public final class PacketStationRouteData implements IMessage {
             writeStr(buf, r.name);
             buf.writeInt(r.trainCount);
             buf.writeShort(r.stationIds.size());
-            for (String sid : r.stationIds) writeStr(buf, sid);
+            for (String sid : r.stationIds)
+                writeStr(buf, sid);
         }
     }
 
@@ -86,7 +87,8 @@ public final class PacketStationRouteData implements IMessage {
             int trainCount = buf.readInt();
             int nSt = buf.readShort();
             List<String> sids = new ArrayList<>(nSt);
-            for (int j = 0; j < nSt; j++) sids.add(readStr(buf));
+            for (int j = 0; j < nSt; j++)
+                sids.add(readStr(buf));
             routes.add(new RouteSnapshot(id, name, sids, trainCount));
         }
     }

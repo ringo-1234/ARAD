@@ -47,7 +47,8 @@ public final class PacketConfirmRoute implements IMessage {
     public void toBytes(ByteBuf buf) {
         writeStr(buf, routeName);
         buf.writeShort(stationIds.size());
-        for (String id : stationIds) writeStr(buf, id);
+        for (String id : stationIds)
+            writeStr(buf, id);
     }
 
     @Override
@@ -55,7 +56,8 @@ public final class PacketConfirmRoute implements IMessage {
         routeName = readStr(buf);
         int count = buf.readShort();
         stationIds = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) stationIds.add(readStr(buf));
+        for (int i = 0; i < count; i++)
+            stationIds.add(readStr(buf));
     }
 
     public static final class Handler implements IMessageHandler<PacketConfirmRoute, IMessage> {
@@ -65,13 +67,15 @@ public final class PacketConfirmRoute implements IMessage {
             WorldServer world = player.getServerWorld();
 
             world.addScheduledTask(() -> {
-                if (msg.stationIds.size() < 2) return;
+                if (msg.stationIds.size() < 2)
+                    return;
 
                 String name = msg.routeName.isEmpty() ? "新路線" : msg.routeName;
 
                 RouteManager rm = RouteManager.get(world);
                 String routeId = rm.createRoute(name);
-                for (String sid : msg.stationIds) rm.addStation(routeId, sid);
+                for (String sid : msg.stationIds)
+                    rm.addStation(routeId, sid);
 
                 List<StationSnapshot> stations = StationRegistry.INSTANCE.toSnapshots();
                 List<RouteSnapshot> routes = rm.toSnapshots();

@@ -16,11 +16,29 @@ public final class MapData {
     public static final MapData INSTANCE = new MapData();
 
     private final List<FormationSnapshot> formations = new ArrayList<>();
-    private final List<PlayerSnapshot>    players    = new ArrayList<>();
+    private final List<PlayerSnapshot> players = new ArrayList<>();
     private final List<StationSnapshot> stations = new ArrayList<>();
-    private final List<RouteSnapshot>   routes   = new ArrayList<>();
+    private final List<RouteSnapshot> routes = new ArrayList<>();
 
-    private MapData() {}
+    private MapData() {
+    }
+
+    public static String resolveServerId() {
+        Minecraft mc = Minecraft.getMinecraft();
+        try {
+            if (mc.isSingleplayer() && mc.getIntegratedServer() != null) {
+                return "sp_" + mc.getIntegratedServer().getFolderName();
+            }
+            if (mc.getCurrentServerData() != null) {
+                String ip = mc.getCurrentServerData().serverIP
+                        .replace(":", "_")
+                        .replace(".", "_");
+                return "mp_" + ip;
+            }
+        } catch (Exception ignored) {
+        }
+        return "default";
+    }
 
     public void onWorldJoin() {
         RailCacheManager.INSTANCE.onWorldJoin(resolveServerId());
@@ -54,14 +72,19 @@ public final class MapData {
     }
 
     public void onStationDataReceived(List<StationSnapshot> s) {
-        stations.clear(); stations.addAll(s);
+        stations.clear();
+        stations.addAll(s);
     }
+
     public void onRouteDataReceived(List<RouteSnapshot> r) {
-        routes.clear(); routes.addAll(r);
+        routes.clear();
+        routes.addAll(r);
     }
+
     public List<StationSnapshot> getStations() {
         return Collections.unmodifiableList(stations);
     }
+
     public List<RouteSnapshot> getRoutes() {
         return Collections.unmodifiableList(routes);
     }
@@ -80,21 +103,5 @@ public final class MapData {
 
     public int cachedChunkCount() {
         return RailCacheManager.INSTANCE.cachedChunkCount();
-    }
-
-    public static String resolveServerId() {
-        Minecraft mc = Minecraft.getMinecraft();
-        try {
-            if (mc.isSingleplayer() && mc.getIntegratedServer() != null) {
-                return "sp_" + mc.getIntegratedServer().getFolderName();
-            }
-            if (mc.getCurrentServerData() != null) {
-                String ip = mc.getCurrentServerData().serverIP
-                        .replace(":", "_")
-                        .replace(".", "_");
-                return "mp_" + ip;
-            }
-        } catch (Exception ignored) {}
-        return "default";
     }
 }

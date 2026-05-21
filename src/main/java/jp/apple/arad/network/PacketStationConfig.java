@@ -31,7 +31,7 @@ public final class PacketStationConfig implements IMessage {
     }
 
     public PacketStationConfig(BlockPos pos, String name,
-                               boolean doorLeft, boolean doorRight, boolean spawnReversed, int dwellTicks) {
+            boolean doorLeft, boolean doorRight, boolean spawnReversed, int dwellTicks) {
         this.x = pos.getX();
         this.y = pos.getY();
         this.z = pos.getZ();
@@ -80,7 +80,8 @@ public final class PacketStationConfig implements IMessage {
 
             world.addScheduledTask(() -> {
                 TileEntity te = world.getTileEntity(new BlockPos(msg.x, msg.y, msg.z));
-                if (!(te instanceof TileEntityStation)) return;
+                if (!(te instanceof TileEntityStation))
+                    return;
 
                 TileEntityStation station = (TileEntityStation) te;
                 station.setStationName(msg.name.isEmpty() ? "駅" : msg.name);

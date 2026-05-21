@@ -1,4 +1,4 @@
-package jp.apple.arad.limit;
+package jp.apple.arad.section;
 
 import jp.apple.arad.AradCore;
 import jp.apple.arad.handler.AradGuiHandler;
@@ -15,12 +15,12 @@ import net.minecraft.world.World;
 
 import javax.annotation.Nullable;
 
-public class BlockSpeedLimitSign extends Block implements ITileEntityProvider {
+public class BlockSectionMarker extends Block implements ITileEntityProvider {
 
-    public BlockSpeedLimitSign() {
+    public BlockSectionMarker() {
         super(Material.IRON);
-        setUnlocalizedName("arad_speed_limit_sign");
-        setRegistryName("arad", "speed_limit_sign");
+        setUnlocalizedName("arad_section_marker");
+        setRegistryName("arad", "section_marker");
         setHardness(2.0f);
         setResistance(12.0f);
     }
@@ -30,7 +30,7 @@ public class BlockSpeedLimitSign extends Block implements ITileEntityProvider {
             EntityPlayer player, EnumHand hand, EnumFacing facing,
             float hitX, float hitY, float hitZ) {
         if (!world.isRemote) {
-            player.openGui(AradCore.INSTANCE, AradGuiHandler.GUI_SPEED_LIMIT,
+            player.openGui(AradCore.INSTANCE, AradGuiHandler.GUI_SECTION_MARKER,
                     world, pos.getX(), pos.getY(), pos.getZ());
         }
         return true;
@@ -44,6 +44,6 @@ public class BlockSpeedLimitSign extends Block implements ITileEntityProvider {
     @Nullable
     @Override
     public TileEntity createNewTileEntity(World world, int meta) {
-        return new TileEntitySpeedLimitSign();
+        return new TileEntitySectionMarker();
     }
 }

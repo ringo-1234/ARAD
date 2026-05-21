@@ -2,3 +2,5 @@ key.categories.arad=ARAD
 key.arad.open_map=マップを開く
 tile.arad_station.name=駅ブロック
 tile.arad_speed_limit_sign.name=制限ブロック
+tile.arad_section_marker.name=閉塞ブロック
+tile.arad_signal_speed_marker.name=信号制限ブロック

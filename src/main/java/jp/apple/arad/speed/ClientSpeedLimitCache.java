@@ -12,12 +12,14 @@ public final class ClientSpeedLimitCache {
 
     private final Map<String, Integer> cache = new HashMap<>();
 
-    private ClientSpeedLimitCache() {}
+    private ClientSpeedLimitCache() {
+    }
 
     public void onDataReceived(List<RailSpeedEntry> entries) {
         cache.clear();
         for (RailSpeedEntry e : entries) {
-            if (e.speedLimitKmh > 0) cache.put(e.key, e.speedLimitKmh);
+            if (e.speedLimitKmh > 0)
+                cache.put(e.key, e.speedLimitKmh);
         }
     }
 

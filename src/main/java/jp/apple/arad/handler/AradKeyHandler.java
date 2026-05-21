@@ -16,8 +16,7 @@ public class AradKeyHandler {
     public static final KeyBinding KEY_OPEN_MAP = new KeyBinding(
             "key.arad.open_map",
             Keyboard.KEY_M,
-            "key.categories.arad"
-    );
+            "key.categories.arad");
 
     public static void register() {
         ClientRegistry.registerKeyBinding(KEY_OPEN_MAP);
@@ -25,7 +24,8 @@ public class AradKeyHandler {
 
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
-        if (!KEY_OPEN_MAP.isPressed()) return;
+        if (!KEY_OPEN_MAP.isPressed())
+            return;
 
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.currentScreen == null && mc.world != null) {

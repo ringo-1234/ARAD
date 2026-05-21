@@ -10,14 +10,23 @@ import java.util.List;
 
 public final class Route {
 
-    public final String       id;
-    public String             name;
-    public final List<String> stationIds  = new ArrayList<>();
-    public int                trainCount  = 0;
+    public final String id;
+    public final List<String> stationIds = new ArrayList<>();
+    public String name;
+    public int trainCount = 0;
 
     public Route(String id, String name) {
-        this.id   = id;
+        this.id = id;
         this.name = name;
+    }
+
+    public static Route fromNBT(NBTTagCompound tag) {
+        Route r = new Route(tag.getString("id"), tag.getString("name"));
+        r.trainCount = tag.hasKey("trainCount") ? tag.getInteger("trainCount") : 0;
+        NBTTagList sl = tag.getTagList("stations", 8);
+        for (int i = 0; i < sl.tagCount(); i++)
+            r.stationIds.add(sl.getStringTagAt(i));
+        return r;
     }
 
     public RouteSnapshot toSnapshot() {
@@ -26,21 +35,14 @@ public final class Route {
 
     public NBTTagCompound toNBT() {
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setString("id",         id);
-        tag.setString("name",       name);
+        tag.setString("id", id);
+        tag.setString("name", name);
         tag.setInteger("trainCount", trainCount);
 
         NBTTagList sl = new NBTTagList();
-        for (String sid : stationIds) sl.appendTag(new NBTTagString(sid));
+        for (String sid : stationIds)
+            sl.appendTag(new NBTTagString(sid));
         tag.setTag("stations", sl);
         return tag;
-    }
-
-    public static Route fromNBT(NBTTagCompound tag) {
-        Route r = new Route(tag.getString("id"), tag.getString("name"));
-        r.trainCount = tag.hasKey("trainCount") ? tag.getInteger("trainCount") : 0;
-        NBTTagList sl = tag.getTagList("stations", 8);
-        for (int i = 0; i < sl.tagCount(); i++) r.stationIds.add(sl.getStringTagAt(i));
-        return r;
     }
 }

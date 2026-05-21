@@ -17,7 +17,12 @@ public final class RailCacheManager {
 
     private String currentServerId = null;
 
-    private RailCacheManager() {}
+    private RailCacheManager() {
+    }
+
+    public static String makeChunkKey(int dim, int chunkX, int chunkZ) {
+        return dim + ":" + chunkX + ":" + chunkZ;
+    }
 
     public void onWorldJoin(String serverId) {
         this.currentServerId = serverId;
@@ -53,10 +58,6 @@ public final class RailCacheManager {
         return cache.size();
     }
 
-    public static String makeChunkKey(int dim, int chunkX, int chunkZ) {
-        return dim + ":" + chunkX + ":" + chunkZ;
-    }
-
     private void saveToDisk(String serverId) {
         NBTTagCompound root = new NBTTagCompound();
         NBTTagList chunkList = new NBTTagList();
@@ -85,7 +86,8 @@ public final class RailCacheManager {
 
     private void loadFromDisk(String serverId) {
         File file = getCacheFile(serverId);
-        if (!file.exists()) return;
+        if (!file.exists())
+            return;
 
         try {
             NBTTagCompound root = CompressedStreamTools.read(file);
@@ -110,10 +112,10 @@ public final class RailCacheManager {
     private File getCacheFile(String serverId) {
         File dir = new File(
                 net.minecraft.client.Minecraft.getMinecraft().mcDataDir,
-                "arad_cache"
-        );
-        if (!dir.exists()) dir.mkdirs();
-        
+                "arad_cache");
+        if (!dir.exists())
+            dir.mkdirs();
+
         String safe = serverId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
         return new File(dir, safe + ".nbt");
     }

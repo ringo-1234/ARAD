@@ -51,7 +51,6 @@ public class GuiStation extends GuiContainer {
         super.initGui();
         Keyboard.enableRepeatEvents(true);
 
-
         int fx = guiLeft + 8;
         nameField = new GuiTextField(0, fontRenderer, fx, guiTop + 6, GUI_W - 16, 16);
         nameField.setMaxStringLength(32);
@@ -59,19 +58,18 @@ public class GuiStation extends GuiContainer {
         nameField.setFocused(true);
         nameField.setCanLoseFocus(true);
 
-
         int dwellSec = container.station.getDwellTimeTicks() / 20;
         dwellField = new GuiTextField(1, fontRenderer, guiLeft + 80, guiTop + 66, 40, 16);
         dwellField.setMaxStringLength(4);
         dwellField.setText(String.valueOf(dwellSec));
         dwellField.setCanLoseFocus(true);
 
-
         buttonList.clear();
         int bw = 70, bh = 18;
         int by = guiTop + 40;
         btnDoorLeft = new GuiButton(BTN_DOOR_LEFT, guiLeft + 8, by, bw, bh, doorLeft ? "§a◀ 左ドア" : "§7◀ 左ドア");
-        btnDoorRight = new GuiButton(BTN_DOOR_RIGHT, guiLeft + 8 + bw + 2, by, bw, bh, doorRight ? "§a右ドア ▶" : "§7右ドア ▶");
+        btnDoorRight = new GuiButton(BTN_DOOR_RIGHT, guiLeft + 8 + bw + 2, by, bw, bh,
+                doorRight ? "§a右ドア ▶" : "§7右ドア ▶");
         btnSpawnReverse = new GuiButton(BTN_SPAWN_REVERSE, guiLeft + 133, guiTop + 66, 35, 16,
                 spawnReversed ? "§a反転" : "§7反転");
         buttonList.add(btnDoorLeft);
@@ -88,7 +86,8 @@ public class GuiStation extends GuiContainer {
 
     private void sendConfigIfChanged() {
         String newName = nameField.getText().trim();
-        if (newName.isEmpty()) newName = "駅";
+        if (newName.isEmpty())
+            newName = "駅";
 
         int dwellSec = parseDwellSec();
         int newTicks = dwellSec * 20;
@@ -119,7 +118,6 @@ public class GuiStation extends GuiContainer {
         }
     }
 
-
     @Override
     protected void actionPerformed(GuiButton button) throws IOException {
         if (button.id == BTN_DOOR_LEFT) {
@@ -133,7 +131,6 @@ public class GuiStation extends GuiContainer {
             btnSpawnReverse.displayString = spawnReversed ? "§a反転" : "§7反転";
         }
     }
-
 
     @Override
     protected void keyTyped(char ch, int keyCode) throws IOException {
@@ -176,34 +173,27 @@ public class GuiStation extends GuiContainer {
         dwellField.updateCursorCounter();
     }
 
-
     @Override
     protected void drawGuiContainerBackgroundLayer(float partial, int mx, int my) {
         GlStateManager.color(1f, 1f, 1f, 1f);
 
-
         drawRect(guiLeft, guiTop, guiLeft + xSize, guiTop + ySize, 0xFF1A2A55);
         drawRect(guiLeft + 1, guiTop + 1, guiLeft + xSize - 1, guiTop + ySize - 1, 0xFF0D1B3E);
-
 
         drawRect(guiLeft + 7, guiTop + 5, guiLeft + xSize - 7, guiTop + 23, 0xFF000000);
         nameField.drawTextBox();
 
-
         fontRenderer.drawString("§7ドア向き:", guiLeft + 8, guiTop + 26, 0xCCDDFF);
-
 
         fontRenderer.drawString("§7停車時間:", guiLeft + 8, guiTop + 70, 0xCCDDFF);
         fontRenderer.drawString("§7秒", guiLeft + 123, guiTop + 70, 0xCCDDFF);
         drawRect(guiLeft + 79, guiTop + 66, guiLeft + 121, guiTop + 84, 0xFF000000);
         dwellField.drawTextBox();
 
-
         fontRenderer.drawString("§7編成:", guiLeft + 8, guiTop + 92, 0xCCDDFF);
         int sx = guiLeft + 79, sy = guiTop + 93;
         drawRect(sx - 1, sy - 1, sx + 19, sy + 19, 0xFF555555);
         drawRect(sx, sy, sx + 18, sy + 18, 0xFF2A2A2A);
-
 
         drawHorizontalLine(guiLeft + 8, guiLeft + xSize - 8, guiTop + 112, 0xFF2A3F70);
         fontRenderer.drawString("§7インベントリ", guiLeft + 8, guiTop + 115, 0x8899CC);

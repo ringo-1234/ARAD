@@ -14,7 +14,9 @@ public final class RouteManager extends WorldSavedData {
 
     private final Map<String, Route> routes = new LinkedHashMap<>();
 
-    public RouteManager(String name) { super(name); }
+    public RouteManager(String name) {
+        super(name);
+    }
 
     public static RouteManager get(World world) {
         RouteManager mgr = (RouteManager) world.loadData(RouteManager.class, DATA_NAME);
@@ -39,26 +41,32 @@ public final class RouteManager extends WorldSavedData {
 
     public void addStation(String routeId, String stationId) {
         Route r = routes.get(routeId);
-        if (r == null) return;
-        if (!r.stationIds.contains(stationId)) r.stationIds.add(stationId);
+        if (r == null)
+            return;
+        if (!r.stationIds.contains(stationId))
+            r.stationIds.add(stationId);
         markDirty();
     }
 
     public void removeStation(String routeId, String stationId) {
         Route r = routes.get(routeId);
-        if (r == null) return;
+        if (r == null)
+            return;
         r.stationIds.remove(stationId);
         markDirty();
     }
 
     public void setTrainCount(String routeId, int count) {
         Route r = routes.get(routeId);
-        if (r == null) return;
+        if (r == null)
+            return;
         r.trainCount = Math.max(0, count);
         markDirty();
     }
 
-    public Route getRoute(String routeId) { return routes.get(routeId); }
+    public Route getRoute(String routeId) {
+        return routes.get(routeId);
+    }
 
     public Collection<Route> getAll() {
         return Collections.unmodifiableCollection(routes.values());
@@ -66,7 +74,8 @@ public final class RouteManager extends WorldSavedData {
 
     public List<RouteSnapshot> toSnapshots() {
         List<RouteSnapshot> list = new ArrayList<>(routes.size());
-        for (Route r : routes.values()) list.add(r.toSnapshot());
+        for (Route r : routes.values())
+            list.add(r.toSnapshot());
         return list;
     }
 
@@ -83,7 +92,8 @@ public final class RouteManager extends WorldSavedData {
     @Override
     public NBTTagCompound writeToNBT(NBTTagCompound nbt) {
         NBTTagList rl = new NBTTagList();
-        for (Route r : routes.values()) rl.appendTag(r.toNBT());
+        for (Route r : routes.values())
+            rl.appendTag(r.toNBT());
         nbt.setTag("routes", rl);
         return nbt;
     }

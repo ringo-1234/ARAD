@@ -77,7 +77,7 @@ public final class PacketFormationData implements IMessage {
             int carCount = buf.readByte() & 0xFF;
             List<float[]> cars = new ArrayList<>(carCount);
             for (int c = 0; c < carCount; c++) {
-                cars.add(new float[]{buf.readFloat(), buf.readFloat(), buf.readFloat()});
+                cars.add(new float[] { buf.readFloat(), buf.readFloat(), buf.readFloat() });
             }
             formations.add(new FormationSnapshot(id, speed, notch, cars));
         }

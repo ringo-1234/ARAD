@@ -1,13 +1,13 @@
 package jp.apple.arad.data;
 
-import jp.apple.arad.network.PacketStationRouteData;
-import jp.apple.arad.route.RouteManager;
-import jp.apple.arad.station.StationRegistry;
 import jp.apple.arad.cache.CachedRail;
 import jp.apple.arad.cache.RailCacheManager;
 import jp.apple.arad.handler.AradPacketHandler;
 import jp.apple.arad.network.PacketFormationData;
 import jp.apple.arad.network.PacketRailData;
+import jp.apple.arad.network.PacketStationRouteData;
+import jp.apple.arad.route.RouteManager;
+import jp.apple.arad.station.StationRegistry;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import jp.ngt.rtm.entity.train.util.Formation;
 import jp.ngt.rtm.entity.train.util.FormationEntry;
@@ -21,7 +21,8 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class ServerData {
 
@@ -29,10 +30,12 @@ public final class ServerData {
 
     private int formationTickCounter = 0;
 
-    private ServerData() {}
+    private ServerData() {
+    }
 
     public void onServerTick(World world) {
-        if (world.isRemote) return;
+        if (world.isRemote)
+            return;
         if (++formationTickCounter >= 20) {
             formationTickCounter = 0;
             sendFormationsAndPlayers(world);
@@ -40,9 +43,10 @@ public final class ServerData {
     }
 
     public void onChunkLoad(Chunk chunk, World world) {
-        if (world.isRemote) return;
+        if (world.isRemote)
+            return;
 
-        int    dim = world.provider.getDimension();
+        int dim = world.provider.getDimension();
         String key = RailCacheManager.makeChunkKey(dim, chunk.x, chunk.z);
 
         List<CachedRail> segs = extractFromChunk(chunk);
@@ -51,7 +55,8 @@ public final class ServerData {
     }
 
     public void onPlayerLogin(EntityPlayerMP player, World world) {
-        if (world.isRemote) return;
+        if (world.isRemote)
+            return;
 
         int dim = world.provider.getDimension();
         int centerCx = player.chunkCoordX;
@@ -63,7 +68,8 @@ public final class ServerData {
         for (int cx = centerCx - scanRadius; cx <= centerCx + scanRadius; cx++) {
             for (int cz = centerCz - scanRadius; cz <= centerCz + scanRadius; cz++) {
                 Chunk chunk = world.getChunkProvider().getLoadedChunk(cx, cz);
-                if (chunk == null) continue;
+                if (chunk == null)
+                    continue;
                 String key = RailCacheManager.makeChunkKey(dim, cx, cz);
                 List<CachedRail> segs = extractFromChunk(chunk);
                 AradPacketHandler.CHANNEL.sendTo(new PacketRailData(key, segs), player);
@@ -71,16 +77,16 @@ public final class ServerData {
         }
 
         List<FormationSnapshot> formations = collectFormationSnapshots();
-        List<PlayerSnapshot>    players    = collectPlayerSnapshots();
-        List<StationSnapshot>   stations   = StationRegistry.INSTANCE.toSnapshots();
-        List<RouteSnapshot>     routes     = RouteManager.get(world).toSnapshots();
+        List<PlayerSnapshot> players = collectPlayerSnapshots();
+        List<StationSnapshot> stations = StationRegistry.INSTANCE.toSnapshots();
+        List<RouteSnapshot> routes = RouteManager.get(world).toSnapshots();
         AradPacketHandler.CHANNEL.sendTo(new PacketFormationData(formations, players), player);
         AradPacketHandler.CHANNEL.sendTo(new PacketStationRouteData(stations, routes), player);
     }
 
     private void sendFormationsAndPlayers(World world) {
         List<FormationSnapshot> formations = collectFormationSnapshots();
-        List<PlayerSnapshot>    players    = collectPlayerSnapshots();
+        List<PlayerSnapshot> players = collectPlayerSnapshots();
         AradPacketHandler.CHANNEL.sendToAll(new PacketFormationData(formations, players));
     }
 
@@ -101,12 +107,14 @@ public final class ServerData {
     private List<CachedRail> extractFromCore(TileEntityLargeRailCore core) {
         List<CachedRail> result = new ArrayList<>();
         RailMap[] maps = core.getAllRailMaps();
-        if (maps == null) return result;
+        if (maps == null)
+            return result;
 
         BlockPos corePos = core.getPos();
 
         for (RailMap rm : maps) {
-            if (rm == null) continue;
+            if (rm == null)
+                continue;
             int split = Math.min(128, Math.max(4, (int) (rm.getLength() * 2.0)));
             float[] x = new float[split + 1];
             float[] z = new float[split + 1];
@@ -122,18 +130,21 @@ public final class ServerData {
 
     public List<FormationSnapshot> collectFormationSnapshots() {
         List<FormationSnapshot> result = new ArrayList<>();
-        if (FormationManager.getInstance() == null) return result;
+        if (FormationManager.getInstance() == null)
+            return result;
 
         for (Formation formation : FormationManager.getInstance().getFormations().values()) {
-            if (formation.entries == null) continue;
+            if (formation.entries == null)
+                continue;
 
-            List<float[]> cars          = new ArrayList<>();
-            float         speed         = 0f;
-            boolean       hasAliveTrain = false;
-            String        displayName   = null;
+            List<float[]> cars = new ArrayList<>();
+            float speed = 0f;
+            boolean hasAliveTrain = false;
+            String displayName = null;
 
             for (FormationEntry entry : formation.entries) {
-                if (entry == null || entry.train == null || entry.train.isDead) continue;
+                if (entry == null || entry.train == null || entry.train.isDead)
+                    continue;
 
                 EntityTrainBase train = entry.train;
 
@@ -146,17 +157,19 @@ public final class ServerData {
                             displayName = train.getResourceState().getResourceSet()
                                     .getConfig().getName();
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                 }
 
-                cars.add(new float[]{
+                cars.add(new float[] {
                         (float) train.posX,
                         (float) train.posZ,
                         train.rotationYaw
                 });
             }
 
-            if (!hasAliveTrain || cars.isEmpty()) continue;
+            if (!hasAliveTrain || cars.isEmpty())
+                continue;
 
             if (displayName == null || displayName.isEmpty()) {
                 displayName = String.format("F%03d", formation.id % 1000);
@@ -180,8 +193,7 @@ public final class ServerData {
                         (float) p.posX,
                         (float) p.posZ,
                         p.rotationYaw,
-                        p.getName()
-                ));
+                        p.getName()));
             }
         } catch (Exception ignored) {
         }

@@ -18,7 +18,8 @@ public final class PacketSpeedLimitSignConfig implements IMessage {
     private int speedLimitKmh;
     private int startOffsetBlocks;
 
-    public PacketSpeedLimitSignConfig() {}
+    public PacketSpeedLimitSignConfig() {
+    }
 
     public PacketSpeedLimitSignConfig(BlockPos pos, int speedLimitKmh, int startOffsetBlocks) {
         this.x = pos.getX();
@@ -54,7 +55,8 @@ public final class PacketSpeedLimitSignConfig implements IMessage {
 
             world.addScheduledTask(() -> {
                 TileEntity te = world.getTileEntity(new BlockPos(msg.x, msg.y, msg.z));
-                if (!(te instanceof TileEntitySpeedLimitSign)) return;
+                if (!(te instanceof TileEntitySpeedLimitSign))
+                    return;
 
                 TileEntitySpeedLimitSign sign = (TileEntitySpeedLimitSign) te;
                 sign.setConfig(msg.speedLimitKmh, msg.startOffsetBlocks);

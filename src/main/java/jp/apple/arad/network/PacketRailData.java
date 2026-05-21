@@ -74,9 +74,8 @@ public final class PacketRailData implements IMessage {
         @Override
         @SideOnly(Side.CLIENT)
         public IMessage onMessage(PacketRailData msg, MessageContext ctx) {
-            Minecraft.getMinecraft().addScheduledTask(() ->
-                    MapData.INSTANCE.onRailDataReceived(msg.chunkKey, msg.segments)
-            );
+            Minecraft.getMinecraft()
+                    .addScheduledTask(() -> MapData.INSTANCE.onRailDataReceived(msg.chunkKey, msg.segments));
             return null;
         }
     }

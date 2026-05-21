@@ -31,13 +31,15 @@ public final class StationCacheStore extends WorldSavedData {
     }
 
     public void upsert(StationSnapshot snapshot) {
-        if (snapshot == null || snapshot.id == null || snapshot.id.isEmpty()) return;
+        if (snapshot == null || snapshot.id == null || snapshot.id.isEmpty())
+            return;
         snapshotMap.put(snapshot.id, snapshot);
         markDirty();
     }
 
     public void remove(String stationId) {
-        if (stationId == null || stationId.isEmpty()) return;
+        if (stationId == null || stationId.isEmpty())
+            return;
         if (snapshotMap.remove(stationId) != null) {
             markDirty();
         }
@@ -66,8 +68,7 @@ public final class StationCacheStore extends WorldSavedData {
                     !tag.hasKey("doorLeft") || tag.getBoolean("doorLeft"),
                     !tag.hasKey("doorRight") || tag.getBoolean("doorRight"),
                     tag.hasKey("spawnReversed") && tag.getBoolean("spawnReversed"),
-                    tag.hasKey("dwellTicks") ? tag.getInteger("dwellTicks") : 400
-            );
+                    tag.hasKey("dwellTicks") ? tag.getInteger("dwellTicks") : 400);
             if (s.id != null && !s.id.isEmpty()) {
                 snapshotMap.put(s.id, s);
             }

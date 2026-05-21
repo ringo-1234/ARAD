@@ -44,23 +44,28 @@ public class ContainerStation extends Container {
     public ItemStack transferStackInSlot(EntityPlayer player, int index) {
         ItemStack result = ItemStack.EMPTY;
         Slot slot = inventorySlots.get(index);
-        if (slot == null || !slot.getHasStack()) return result;
+        if (slot == null || !slot.getHasStack())
+            return result;
 
         ItemStack stack = slot.getStack();
         result = stack.copy();
 
         if (index == 0) {
-            if (!mergeItemStack(stack, 1, inventorySlots.size(), true)) return ItemStack.EMPTY;
+            if (!mergeItemStack(stack, 1, inventorySlots.size(), true))
+                return ItemStack.EMPTY;
         } else {
             if (station.isItemValidForSlot(0, stack) && !inventorySlots.get(0).getHasStack()) {
-                if (!mergeItemStack(stack, 0, 1, false)) return ItemStack.EMPTY;
+                if (!mergeItemStack(stack, 0, 1, false))
+                    return ItemStack.EMPTY;
             } else {
                 return ItemStack.EMPTY;
             }
         }
 
-        if (stack.isEmpty()) slot.putStack(ItemStack.EMPTY);
-        else slot.onSlotChanged();
+        if (stack.isEmpty())
+            slot.putStack(ItemStack.EMPTY);
+        else
+            slot.onSlotChanged();
 
         return result;
     }

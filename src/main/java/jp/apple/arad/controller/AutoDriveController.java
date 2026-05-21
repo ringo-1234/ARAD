@@ -4,6 +4,7 @@ import jp.apple.arad.data.StationSnapshot;
 import jp.apple.arad.limit.TileEntitySpeedLimitSign;
 import jp.apple.arad.route.Route;
 import jp.apple.arad.route.RouteManager;
+import jp.apple.arad.section.SectionSlot;
 import jp.apple.arad.station.StationRegistry;
 import jp.apple.arad.station.TileEntityStation;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
@@ -68,9 +69,23 @@ public final class AutoDriveController {
     private static final int PHASE_LEVEL = 5;
     private static final float LAUNCH_FORCE_SPEED = 0.04f;
     private static final int LAUNCH_FORCE_NOTCH = 3;
+
+    private static final float SECTION_REACH_TOLERANCE_KMH = 1.5f;
+
+    private static final float SECTION_OVER_COAST_KMH = 0.7f;
+
+    private static final float SECTION_OVER_BRAKE1_KMH = 3.0f;
+
+    private static final float SECTION_OVER_BRAKE2_KMH = 8.0f;
+
+    private static final float SECTION_APPROACH_MARGIN_KMH = 15.0f;
+
+    private static final double SECTION_STOP_PHASE_MARGIN = 1.2;
+    private static final int SLOT_CHECK_INTERVAL = 4;
     private final long formationId;
     private final String routeId;
     private final int lineFormationIndex;
+    private int[] signalSpeedMap = null;
     private long predecessorFormationId;
     private int currentStationIdx = 0;
     private int dwellTimer = DEFAULT_DWELL_TICKS;
@@ -100,6 +115,11 @@ public final class AutoDriveController {
     private int missingFormationTicks = 0;
     private int missingLeadTicks = 0;
     private DriveState state = DriveState.EN_ROUTE;
+    private List<SectionSlot> sectionSlots = null;
+    private int sectionSpeedLimitKmh = -1;
+    private boolean sectionCoastMode = false;
+    private int slotCheckCooldown = 0;
+    private int lastPassedSectionLimitKmh = -1;
 
     public AutoDriveController(long formationId, String routeId) {
         this(formationId, routeId, 0, 0L);
@@ -115,13 +135,17 @@ public final class AutoDriveController {
     }
 
     private static int calcStopNotch(double dist, float speed, float[] decel) {
-        if (dist <= 0.45) return NOTCH_FULL_BRAKE;
+        if (dist <= 0.45)
+            return NOTCH_FULL_BRAKE;
         float baseDecel = decel[4];
         double idealSpeed = Math.sqrt(Math.max(0.0, 2.0 * baseDecel * Math.max(dist - 0.25, 0.0)));
         double err = speed - idealSpeed;
-        if (err > 0.03) return NOTCH_FULL_BRAKE;
-        if (err > 0.01) return -3;
-        if (dist > 4.0 && err < -0.05) return 1;
+        if (err > 0.03)
+            return NOTCH_FULL_BRAKE;
+        if (err > 0.01)
+            return -3;
+        if (dist > 4.0 && err < -0.05)
+            return 1;
         return 0;
     }
 
@@ -138,21 +162,28 @@ public final class AutoDriveController {
         try {
             float[] raw = lead.getResourceState().getResourceSet().getConfig().deccelerations;
             float[] res = new float[9];
-            for (int i = 0; i < 9; i++) res[i] = i < raw.length ? Math.abs(raw[i]) : 0.002f;
+            for (int i = 0; i < 9; i++)
+                res[i] = i < raw.length ? Math.abs(raw[i]) : 0.002f;
             return res;
         } catch (Exception e) {
-            return new float[]{0.0002f, 0.0005f, 0.001f, 0.0015f, 0.002f, 0.0025f, 0.003f, 0.0035f, 0.01f};
+            return new float[] { 0.0002f, 0.0005f, 0.001f, 0.0015f, 0.002f, 0.0025f, 0.003f, 0.0035f, 0.01f };
         }
     }
 
     private static int calcCruiseNotch(float current, float target) {
-        if (target <= 0.0f) return 0;
+        if (target <= 0.0f)
+            return 0;
         float r = current / target;
-        if (r < 0.88f) return 5;
-        if (r < 0.94f) return 3;
-        if (r < 0.98f) return 1;
-        if (r > 1.05f) return -2;
-        if (r > 1.02f) return -1;
+        if (r < 0.88f)
+            return 5;
+        if (r < 0.94f)
+            return 3;
+        if (r < 0.98f)
+            return 1;
+        if (r > 1.05f)
+            return -2;
+        if (r > 1.02f)
+            return -1;
         return 0;
     }
 
@@ -198,7 +229,8 @@ public final class AutoDriveController {
     }
 
     private static PathProjection projectToAheadPath(List<PathPoint> path, double tx, double tz) {
-        if (path == null || path.size() < 2) return null;
+        if (path == null || path.size() < 2)
+            return null;
         double bestLateral = Double.MAX_VALUE;
         double bestLongitudinal = -1.0;
         for (int i = 0; i < path.size() - 1; i++) {
@@ -207,12 +239,15 @@ public final class AutoDriveController {
             double sx = b.x - a.x;
             double sz = b.z - a.z;
             double segLen2 = sx * sx + sz * sz;
-            if (segLen2 < TANGENT_MIN_NORM) continue;
+            if (segLen2 < TANGENT_MIN_NORM)
+                continue;
             double ux = tx - a.x;
             double uz = tz - a.z;
             double t = (ux * sx + uz * sz) / segLen2;
-            if (t < 0.0) t = 0.0;
-            else if (t > 1.0) t = 1.0;
+            if (t < 0.0)
+                t = 0.0;
+            else if (t > 1.0)
+                t = 1.0;
             double nx = a.x + sx * t;
             double nz = a.z + sz * t;
             double lateral = distXZ(tx, tz, nx, nz);
@@ -221,23 +256,44 @@ public final class AutoDriveController {
                 bestLongitudinal = a.s + Math.sqrt(segLen2) * t;
             }
         }
-        if (bestLongitudinal < 0.0) return null;
+        if (bestLongitudinal < 0.0)
+            return null;
         return new PathProjection(bestLongitudinal, bestLateral);
     }
 
     private static double calcBrakeDist(float speed, float decelPerTick) {
-        if (decelPerTick <= 0.0f || speed <= 0.0f) return 0.0;
+        if (decelPerTick <= 0.0f || speed <= 0.0f)
+            return 0.0;
         return (double) (speed * speed) / (2.0 * decelPerTick);
+    }
+
+    private static double calcSpeedDropDist(float currentSpeed, float targetSpeed, float decelPerTick) {
+        if (decelPerTick <= 0.0f || currentSpeed <= targetSpeed)
+            return 0.0;
+        double v2 = (double) currentSpeed * (double) currentSpeed;
+        double u2 = (double) targetSpeed * (double) targetSpeed;
+        return (v2 - u2) / (2.0 * decelPerTick);
+    }
+
+    private static double calcAheadDetectDist(double brakePhaseStart) {
+        return Math.min(AHEAD_DETECT_MAX,
+                Math.max(COL_WARN_DIST, brakePhaseStart + COL_MARGIN + CAR_LENGTH_BLOCKS + AHEAD_DETECT_MARGIN));
+    }
+
+    private static double distSq2D(EntityTrainBase a, EntityTrainBase b) {
+        double dx = b.posX - a.posX;
+        double dz = b.posZ - a.posZ;
+        return dx * dx + dz * dz;
     }
 
     public boolean tick(World world) {
         Formation formation = FormationManager.getInstance().getFormation(formationId);
         if (formation == null) {
-            if (++missingFormationTicks < MISSING_FORMATION_GRACE_TICKS) return true;
-            return false;
+            return ++missingFormationTicks < MISSING_FORMATION_GRACE_TICKS;
         }
         missingFormationTicks = 0;
-        if (++controlAccumTicks < CONTROL_INTERVAL_TICKS) return true;
+        if (++controlAccumTicks < CONTROL_INTERVAL_TICKS)
+            return true;
         int dt = controlAccumTicks;
         controlAccumTicks = 0;
 
@@ -248,8 +304,7 @@ public final class AutoDriveController {
         }
         EntityTrainBase lead = getLeadTrain(formation);
         if (lead == null || lead.isDead) {
-            if (++missingLeadTicks < MISSING_LEAD_GRACE_TICKS) return true;
-            return false;
+            return ++missingLeadTicks < MISSING_LEAD_GRACE_TICKS;
         }
         missingLeadTicks = 0;
 
@@ -281,7 +336,8 @@ public final class AutoDriveController {
             applyNotchDirect(formation, NOTCH_EB);
             return;
         }
-        if (appliedNotch == targetNotch) return;
+        if (appliedNotch == targetNotch)
+            return;
         if (targetNotch < appliedNotch) {
             boolean urgentBrake = (targetNotch <= -3) || ((appliedNotch - targetNotch) >= 3);
             if (urgentBrake) {
@@ -306,35 +362,49 @@ public final class AutoDriveController {
         }
     }
 
-    private void tickEnRoute(World world, Formation formation, EntityTrainBase lead, List<String> stationIds, int dt) {
+    private void tickEnRoute(World world, Formation formation, EntityTrainBase lead,
+            List<String> stationIds, int dt) {
         float speed = Math.abs(lead.getSpeed());
         float[] decel = getDecelTableCached(lead);
         updateLimitBlockState(world, lead, dt);
         double brakePhaseStart = calcBrakeDist(speed, decel[PHASE_LEVEL]) * PHASE_MARGIN;
         String targetStationId = (currentStationIdx >= 0 && currentStationIdx < stationIds.size())
-                ? stationIds.get(currentStationIdx) : null;
-        StationSnapshot targetSnap = (targetStationId != null) ? StationRegistry.INSTANCE.getSnapshot(targetStationId) : null;
-        if (targetSnap != null && targetSnap.dim != world.provider.getDimension()) {
+                ? stationIds.get(currentStationIdx)
+                : null;
+        StationSnapshot targetSnap = (targetStationId != null)
+                ? StationRegistry.INSTANCE.getSnapshot(targetStationId)
+                : null;
+        if (targetSnap != null && targetSnap.dim != world.provider.getDimension())
             targetSnap = null;
-        }
+
         boolean inLaunchGrace = launchGraceTicks > 0;
-        if (inLaunchGrace) launchGraceTicks = Math.max(0, launchGraceTicks - dt);
-        if (speed < 0.005f) stuckTicks += dt;
-        else stuckTicks = 0;
+        if (inLaunchGrace)
+            launchGraceTicks = Math.max(0, launchGraceTicks - dt);
+        if (speed < 0.005f)
+            stuckTicks += dt;
+        else
+            stuckTicks = 0;
+
         double aheadDist = getAheadFormationDist(lead, brakePhaseStart);
         double distToTarget = Double.MAX_VALUE;
         double forwardDistSt = Double.MAX_VALUE;
+
         if (!inLaunchGrace && targetSnap != null) {
             double tx = targetSnap.x;
             double tz = targetSnap.z;
             distToTarget = distXZ(lead.posX, lead.posZ, tx, tz);
             forwardDistSt = distToTarget;
             boolean isStoppedAtStation = (speed < 0.01f && distToTarget < 3.0);
-            boolean inArrivalBand = (forwardDistSt >= -0.5 && forwardDistSt <= ARRIVE_DIST_IN && speed <= ARRIVE_SPEED_IN);
-            boolean inArrivalOuterBand = (forwardDistSt >= -0.5 && forwardDistSt <= ARRIVE_DIST_OUT && speed <= ARRIVE_SPEED_OUT);
-            if (inArrivalOuterBand) arrivalLatched = true;
-            if (inArrivalBand) arriveConfirmTicks += dt;
-            else arriveConfirmTicks = 0;
+            boolean inArrivalBand = (forwardDistSt >= -0.5 && forwardDistSt <= ARRIVE_DIST_IN
+                    && speed <= ARRIVE_SPEED_IN);
+            boolean inArrivalOuterBand = (forwardDistSt >= -0.5 && forwardDistSt <= ARRIVE_DIST_OUT
+                    && speed <= ARRIVE_SPEED_OUT);
+            if (inArrivalOuterBand)
+                arrivalLatched = true;
+            if (inArrivalBand)
+                arriveConfirmTicks += dt;
+            else
+                arriveConfirmTicks = 0;
             if (arrivalLatched || (inArrivalBand && arriveConfirmTicks >= ARRIVE_CONFIRM_TICKS) || isStoppedAtStation) {
                 holdStationStop(formation);
                 arrivalLatched = false;
@@ -346,14 +416,19 @@ public final class AutoDriveController {
                 return;
             }
         }
+
         double effectiveDist = Double.MAX_VALUE;
-        if (aheadDist >= 0) effectiveDist = aheadDist - COL_EB_DIST;
-        if (forwardDistSt >= 0) effectiveDist = Math.min(effectiveDist, forwardDistSt - STOP_BUFFER);
+        if (aheadDist >= 0)
+            effectiveDist = aheadDist - COL_EB_DIST;
+        if (forwardDistSt >= 0)
+            effectiveDist = Math.min(effectiveDist, forwardDistSt - STOP_BUFFER);
+
         if (aheadDist >= 0 && aheadDist <= COL_EB_DIST) {
             hardStop(formation);
             stuckTicks = 0;
             return;
         }
+
         if (inLaunchGrace && speed < LAUNCH_FORCE_SPEED && (aheadDist < 0.0 || aheadDist > COL_MARGIN)) {
             state = DriveState.EN_ROUTE;
             targetNotch = LAUNCH_FORCE_NOTCH;
@@ -364,6 +439,7 @@ public final class AutoDriveController {
             notchStepTimer = 0;
             return;
         }
+
         if (stuckTicks >= 80 && (aheadDist < 0.0 || aheadDist > COL_MARGIN)) {
             state = DriveState.EN_ROUTE;
             targetNotch = NOTCH_MAX;
@@ -373,32 +449,33 @@ public final class AutoDriveController {
             stuckTicks = 0;
             return;
         }
+
         boolean shouldBrake = (state == DriveState.BRAKING)
                 ? (effectiveDist < brakePhaseStart + BRAKE_HYSTERESIS)
                 : (effectiveDist < brakePhaseStart);
-        if (!shouldBrake
-                && targetSnap != null
-                && forwardDistSt >= 0.0
-                && forwardDistSt <= STATION_CAPTURE_DIST
-                && speed > ARRIVE_SPEED_IN) {
+        if (!shouldBrake && targetSnap != null && forwardDistSt >= 0.0
+                && forwardDistSt <= STATION_CAPTURE_DIST && speed > ARRIVE_SPEED_IN) {
             shouldBrake = true;
         }
         if (shouldBrake) {
             state = DriveState.BRAKING;
             int stopNotch = calcStopNotch(effectiveDist, speed, decel);
             if (targetSnap != null && forwardDistSt >= 0.0 && forwardDistSt <= STATION_CAPTURE_DIST) {
-                if (speed > ARRIVE_SPEED_OUT) {
+                if (speed > ARRIVE_SPEED_OUT)
                     stopNotch = Math.min(stopNotch, -2);
-                } else if (speed > ARRIVE_SPEED_IN) {
+                else if (speed > ARRIVE_SPEED_IN)
                     stopNotch = Math.min(stopNotch, -1);
-                }
             }
             setTarget(stopNotch);
             return;
         }
 
-        if (applyPendingLimitControl(speed, decel)) return;
-        if (applyActiveLimitControl(speed)) return;
+        if (applyPendingLimitControl(speed, decel))
+            return;
+        if (applySlotSignalControl(world, lead, speed, decel))
+            return;
+        if (applyActiveLimitControl(speed))
+            return;
 
         state = DriveState.EN_ROUTE;
         setTarget(NOTCH_MAX);
@@ -414,7 +491,8 @@ public final class AutoDriveController {
         }
     }
 
-    private void tickDoorOpen(Formation formation, EntityTrainBase lead, List<String> stationIds, int dt) {
+    private void tickDoorOpen(Formation formation, EntityTrainBase lead,
+            List<String> stationIds, int dt) {
         TileEntityStation cs = getStation(stationIds, currentStationIdx);
         StationSnapshot ss = getStationSnapshot(stationIds, currentStationIdx);
         if (!dwellInitialized) {
@@ -453,9 +531,8 @@ public final class AutoDriveController {
         holdStationStop(formation);
         stuckTicks = 0;
         dwellTimer -= dt;
-        if (dwellTimer <= 0) {
+        if (dwellTimer <= 0)
             departAfterStop(formation);
-        }
     }
 
     private void departAfterStop(Formation formation) {
@@ -467,7 +544,8 @@ public final class AutoDriveController {
         odometerReady = false;
         state = DriveState.EN_ROUTE;
         EntityTrainBase lead = getLeadTrain(formation);
-        if (lead != null && !lead.isDead) applyRoleFront(lead);
+        if (lead != null && !lead.isDead)
+            applyRoleFront(lead);
         applyNotchDirect(formation, 0);
         targetNotch = 1;
         appliedNotch = 0;
@@ -476,10 +554,12 @@ public final class AutoDriveController {
     }
 
     private void applyNotchDirect(Formation formation, int notch) {
-        if (lastCommandedNotch == notch) return;
+        if (lastCommandedNotch == notch)
+            return;
         lastCommandedNotch = notch;
         for (FormationEntry e : formation.entries) {
-            if (e.train != null) e.train.setNotch(notch);
+            if (e.train != null)
+                e.train.setNotch(notch);
         }
     }
 
@@ -489,9 +569,8 @@ public final class AutoDriveController {
 
     private void applyDoorState(Formation formation, byte doorData) {
         for (FormationEntry e : formation.entries) {
-            if (e != null && e.train != null && !e.train.isDead) {
+            if (e != null && e.train != null && !e.train.isDead)
                 e.train.setVehicleState(TrainState.TrainStateType.Door, doorData);
-            }
         }
     }
 
@@ -514,30 +593,29 @@ public final class AutoDriveController {
     }
 
     private void updateLimitBlockState(World world, EntityTrainBase lead, int dt) {
-        if (lead == null || lead.isDead || world == null) return;
-
+        if (lead == null || lead.isDead || world == null)
+            return;
         double moved = 0.0;
         if (odometerReady) {
             moved = distXZ(odometerLastX, odometerLastZ, lead.posX, lead.posZ);
-            if (moved > 20.0) moved = 0.0;
+            if (moved > 20.0)
+                moved = 0.0;
         }
         odometerLastX = lead.posX;
         odometerLastZ = lead.posZ;
         odometerReady = true;
 
-        if (pendingBlockLimitKmh > 0 && pendingBlockLimitRemain > 0.0 && moved > 0.0) {
+        if (pendingBlockLimitKmh > 0 && pendingBlockLimitRemain > 0.0 && moved > 0.0)
             pendingBlockLimitRemain -= moved;
-        }
 
         TileEntitySpeedLimitSign sign = findLimitBlockUnderTrain(world, lead);
         if (sign == null) {
             lastTriggeredLimitPos = null;
             return;
         }
-
         BlockPos signPos = sign.getPos();
-        if (signPos.equals(lastTriggeredLimitPos)) return;
-
+        if (signPos.equals(lastTriggeredLimitPos))
+            return;
         lastTriggeredLimitPos = signPos;
         pendingBlockLimitKmh = sign.getSpeedLimitKmh();
         pendingBlockLimitRemain = Math.max(0, sign.getStartOffsetBlocks());
@@ -549,16 +627,14 @@ public final class AutoDriveController {
         int baseY = (int) Math.floor(lead.posY);
         int baseZ = (int) Math.floor(lead.posZ);
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
         for (int dy = 0; dy <= LIMIT_BLOCK_DETECT_DEPTH; dy++) {
             int y = baseY - dy;
             for (int dx = -LIMIT_BLOCK_DETECT_RADIUS_XZ; dx <= LIMIT_BLOCK_DETECT_RADIUS_XZ; dx++) {
                 for (int dz = -LIMIT_BLOCK_DETECT_RADIUS_XZ; dz <= LIMIT_BLOCK_DETECT_RADIUS_XZ; dz++) {
                     pos.setPos(baseX + dx, y, baseZ + dz);
                     TileEntity te = world.getTileEntity(pos);
-                    if (te instanceof TileEntitySpeedLimitSign) {
+                    if (te instanceof TileEntitySpeedLimitSign)
                         return (TileEntitySpeedLimitSign) te;
-                    }
                 }
             }
         }
@@ -566,8 +642,8 @@ public final class AutoDriveController {
     }
 
     private boolean applyPendingLimitControl(float speed, float[] decel) {
-        if (pendingBlockLimitKmh <= 0) return false;
-
+        if (pendingBlockLimitKmh <= 0)
+            return false;
         float pendingLimitSpeed = pendingBlockLimitKmh * KMH_TO_RTM;
         if (pendingBlockLimitRemain <= 0.0) {
             activatePendingLimit();
@@ -578,33 +654,31 @@ public final class AutoDriveController {
             }
             return false;
         }
-
-        if (speed <= pendingLimitSpeed) return false;
-
+        if (speed <= pendingLimitSpeed)
+            return false;
         double needBrakeDist = calcSpeedDropDist(speed, pendingLimitSpeed, decel[PHASE_LEVEL]) * PHASE_MARGIN;
-        if (pendingBlockLimitRemain > needBrakeDist + LIMIT_BRAKE_MARGIN) return false;
-
+        if (pendingBlockLimitRemain > needBrakeDist + LIMIT_BRAKE_MARGIN)
+            return false;
         state = DriveState.BRAKING;
         if (pendingBlockLimitRemain <= 0.8) {
             setTarget(NOTCH_FULL_BRAKE);
             return true;
         }
-
         double ratio = pendingBlockLimitRemain / Math.max(needBrakeDist, 0.001);
-        if (ratio < 0.70) {
+        if (ratio < 0.70)
             setTarget(NOTCH_FULL_BRAKE);
-        } else if (ratio < 0.90) {
+        else if (ratio < 0.90)
             setTarget(-4);
-        } else if (ratio < 1.10) {
+        else if (ratio < 1.10)
             setTarget(-3);
-        } else {
+        else
             setTarget(-2);
-        }
         return true;
     }
 
     private void activatePendingLimit() {
-        if (pendingBlockLimitKmh <= 0) return;
+        if (pendingBlockLimitKmh <= 0)
+            return;
         activeBlockLimitKmh = pendingBlockLimitKmh;
         pendingBlockLimitKmh = 0;
         pendingBlockLimitRemain = -1.0;
@@ -616,10 +690,8 @@ public final class AutoDriveController {
             blockLimitCoastMode = false;
             return false;
         }
-
         float limitSpeed = activeBlockLimitKmh * KMH_TO_RTM;
         float lowBandSpeed = Math.max(0.0f, (activeBlockLimitKmh - LIMIT_HYSTERESIS_KMH) * KMH_TO_RTM);
-
         state = DriveState.EN_ROUTE;
         if (speed > limitSpeed + LIMIT_OVER_FULL_BRAKE_KMH * KMH_TO_RTM) {
             setTarget(NOTCH_FULL_BRAKE);
@@ -633,53 +705,254 @@ public final class AutoDriveController {
             setTarget(-1);
             return true;
         }
-
         if (blockLimitCoastMode) {
-            if (speed <= lowBandSpeed) {
+            if (speed <= lowBandSpeed)
                 blockLimitCoastMode = false;
-            } else {
+            else {
                 setTarget(0);
                 return true;
             }
         }
-
         if (speed >= limitSpeed - LIMIT_REACH_TOLERANCE_KMH * KMH_TO_RTM) {
             blockLimitCoastMode = true;
             setTarget(0);
             return true;
         }
-
         setTarget(NOTCH_MAX);
         return true;
     }
 
-    private static double calcSpeedDropDist(float currentSpeed, float targetSpeed, float decelPerTick) {
-        if (decelPerTick <= 0.0f || currentSpeed <= targetSpeed) return 0.0;
-        double v2 = (double) currentSpeed * (double) currentSpeed;
-        double u2 = (double) targetSpeed * (double) targetSpeed;
-        return (v2 - u2) / (2.0 * decelPerTick);
+    private boolean applySlotSignalControl(World world, EntityTrainBase lead,
+            float speed, float[] decel) {
+        if (sectionSlots == null || sectionSlots.isEmpty()) {
+            sectionSpeedLimitKmh = -1;
+            sectionCoastMode = false;
+            return false;
+        }
+
+        if (slotCheckCooldown > 0) {
+            slotCheckCooldown--;
+        } else {
+            slotCheckCooldown = SLOT_CHECK_INTERVAL;
+            advancePassedSlots(lead);
+        }
+
+        if (sectionSlots.isEmpty()) {
+            sectionSpeedLimitKmh = -1;
+            sectionCoastMode = false;
+            return false;
+        }
+
+        updateSectionSpeedLimit(world);
+
+        int nextLimitKmh = sectionSpeedLimitKmh;
+
+        if (nextLimitKmh < 0) {
+            sectionCoastMode = false;
+            return false;
+        }
+
+        int currentLimitKmh = lastPassedSectionLimitKmh;
+        if (currentLimitKmh <= 0)
+            currentLimitKmh = Integer.MAX_VALUE;
+        if (activeBlockLimitKmh > 0)
+            currentLimitKmh = Math.min(currentLimitKmh, activeBlockLimitKmh);
+
+        SectionSlot slot = sectionSlots.get(0);
+        double distToSignal = Double.MAX_VALUE;
+        if (slot.signalPos != null) {
+            distToSignal = distXZ(lead.posX, lead.posZ, slot.signalPos.getX() + 0.5, slot.signalPos.getZ() + 0.5);
+        }
+
+        double targetMargin = 50.0;
+
+        if (nextLimitKmh == 0) {
+            double stopTargetDist = Math.max(0.0, distToSignal - targetMargin);
+
+            double freeRunDist = speed * 15.0;
+
+            double brakePhaseStart = calcBrakeDist(speed, decel[PHASE_LEVEL]) * SECTION_STOP_PHASE_MARGIN + freeRunDist;
+
+            if (stopTargetDist <= brakePhaseStart + BRAKE_HYSTERESIS) {
+                state = DriveState.BRAKING;
+                sectionCoastMode = false;
+
+                if (speed < 0.01f || stopTargetDist < 2.0) {
+                    setTarget(NOTCH_FULL_BRAKE);
+                    return true;
+                }
+
+                double effectiveDist = Math.max(0.0, stopTargetDist - freeRunDist);
+                double idealSpeed = Math.sqrt(Math.max(0.0, 2.0 * decel[3] * effectiveDist));
+
+                if (speed > idealSpeed + 0.03f)
+                    setTarget(NOTCH_EB);
+                else if (speed > idealSpeed + 0.01f)
+                    setTarget(NOTCH_FULL_BRAKE);
+                else if (speed > idealSpeed)
+                    setTarget(-4);
+                else if (speed > idealSpeed - 0.01f)
+                    setTarget(-2);
+                else
+                    setTarget(-1);
+
+                return true;
+            }
+
+            return applyCruiseControl(speed, currentLimitKmh);
+        }
+
+        float targetSpeed = nextLimitKmh * KMH_TO_RTM;
+
+        if (speed > targetSpeed) {
+            double dropTargetDist = Math.max(0.0, distToSignal - targetMargin);
+            double freeRunDist = speed * 15.0;
+            double dropDist = calcSpeedDropDist(speed, targetSpeed, decel[PHASE_LEVEL]) * SECTION_STOP_PHASE_MARGIN
+                    + freeRunDist;
+
+            if (dropTargetDist <= dropDist + BRAKE_HYSTERESIS) {
+                state = DriveState.BRAKING;
+                sectionCoastMode = false;
+
+                double effectiveDist = Math.max(0.0, dropTargetDist - freeRunDist);
+                double idealSpeed = Math
+                        .sqrt(Math.max(0.0, 2.0 * decel[3] * effectiveDist + targetSpeed * targetSpeed));
+
+                if (speed > idealSpeed + 0.03f)
+                    setTarget(NOTCH_EB);
+                else if (speed > idealSpeed + 0.01f)
+                    setTarget(NOTCH_FULL_BRAKE);
+                else if (speed > idealSpeed)
+                    setTarget(-4);
+                else if (speed > idealSpeed - 0.01f)
+                    setTarget(-2);
+                else
+                    setTarget(-1);
+
+                return true;
+            }
+        }
+
+        return applyCruiseControl(speed, currentLimitKmh);
+    }
+
+    private boolean applyCruiseControl(float speed, int limitKmh) {
+        if (limitKmh >= 999 || limitKmh <= 0)
+            return false;
+
+        float limitSpeed = limitKmh * KMH_TO_RTM;
+        float speedKmh = speed * 72.0f;
+
+        if (speedKmh > limitKmh + SECTION_OVER_BRAKE2_KMH) {
+            state = DriveState.BRAKING;
+            setTarget(NOTCH_FULL_BRAKE);
+            sectionCoastMode = false;
+            return true;
+        }
+        if (speedKmh > limitKmh + SECTION_OVER_BRAKE1_KMH) {
+            state = DriveState.BRAKING;
+            setTarget(-2);
+            sectionCoastMode = false;
+            return true;
+        }
+        if (speedKmh > limitKmh + SECTION_OVER_COAST_KMH) {
+            state = DriveState.EN_ROUTE;
+            setTarget(-1);
+            sectionCoastMode = false;
+            return true;
+        }
+
+        if (sectionCoastMode) {
+            float lowBand = (limitKmh - LIMIT_HYSTERESIS_KMH) * KMH_TO_RTM;
+            if (speed <= lowBand) {
+                sectionCoastMode = false;
+            } else {
+                state = DriveState.EN_ROUTE;
+                setTarget(0);
+                return true;
+            }
+        }
+
+        if (speedKmh >= limitKmh - SECTION_REACH_TOLERANCE_KMH) {
+            sectionCoastMode = true;
+            state = DriveState.EN_ROUTE;
+            setTarget(0);
+            return true;
+        }
+
+        state = DriveState.EN_ROUTE;
+        setTarget(NOTCH_MAX);
+        return true;
+    }
+
+    private void advancePassedSlots(EntityTrainBase lead) {
+        if (lead == null || sectionSlots == null)
+            return;
+        while (!sectionSlots.isEmpty()) {
+            SectionSlot slot = sectionSlots.get(0);
+            if (slot.isCaptured(lead.posX, lead.posZ)) {
+
+                if (sectionSpeedLimitKmh > 0) {
+                    lastPassedSectionLimitKmh = sectionSpeedLimitKmh;
+                }
+                sectionSlots.remove(0);
+                sectionSpeedLimitKmh = -1;
+                sectionCoastMode = false;
+            } else {
+                break;
+            }
+        }
+    }
+
+    private void updateSectionSpeedLimit(World world) {
+        if (world == null || sectionSlots == null || sectionSlots.isEmpty()) {
+            sectionSpeedLimitKmh = -1;
+            return;
+        }
+        SectionSlot slot = sectionSlots.get(0);
+        if (slot.signalPos == null) {
+            sectionSpeedLimitKmh = -1;
+            return;
+        }
+        TileEntity te = world.getTileEntity(slot.signalPos);
+        if (!(te instanceof jp.ngt.rtm.electric.TileEntitySignal)) {
+            sectionSpeedLimitKmh = -1;
+            return;
+        }
+        int level;
+        try {
+            Object raw = jp.ngt.ngtlib.util.NGTUtil.getField(
+                    jp.ngt.rtm.electric.TileEntitySignal.class, te, "signalLevel");
+            level = (raw instanceof Integer) ? (int) raw : 1;
+        } catch (Exception e) {
+            level = 1;
+        }
+        sectionSpeedLimitKmh = resolveSpeedKmh(slot, level);
+    }
+
+    public void onSectionMarkerPassed(List<SectionSlot> slots) {
+        if (slots == null || slots.isEmpty())
+            return;
+        this.sectionSlots = new ArrayList<>(slots);
+        this.sectionSpeedLimitKmh = -1;
+        this.sectionCoastMode = false;
+        this.slotCheckCooldown = 0;
+        this.lastPassedSectionLimitKmh = -1;
     }
 
     private float[] getDecelTableCached(EntityTrainBase lead) {
-        if (decelCache == null) {
+        if (decelCache == null)
             decelCache = getDecelTable(lead);
-        }
         return decelCache;
     }
 
-    private static double calcAheadDetectDist(double brakePhaseStart) {
-        return Math.min(
-                AHEAD_DETECT_MAX,
-                Math.max(COL_WARN_DIST, brakePhaseStart + COL_MARGIN + CAR_LENGTH_BLOCKS + AHEAD_DETECT_MARGIN));
-    }
-
     private double getAheadFormationDist(EntityTrainBase lead, double brakePhaseStart) {
-        if (lead == null) return -1.0;
+        if (lead == null)
+            return -1.0;
         if (aheadDistCacheTicks > 0) {
             aheadDistCacheTicks--;
             return aheadDistCache;
         }
-
         double detectDist = calcAheadDetectDist(brakePhaseStart) + COL_MARGIN;
         EntityTrainBase tail = resolvePredecessorTail();
         if (tail == null) {
@@ -687,13 +960,10 @@ public final class AutoDriveController {
             aheadDistCacheTicks = AHEAD_DIST_REFRESH_TICKS;
             return aheadDistCache;
         }
-
         double centerDistSq = distSq2D(lead, tail);
-        if (centerDistSq < 1.0 || centerDistSq >= detectDist * detectDist) {
-            aheadDistCache = -1.0;
-        } else {
-            aheadDistCache = Math.sqrt(centerDistSq) - AHEAD_CENTER_OFFSET;
-        }
+        aheadDistCache = (centerDistSq < 1.0 || centerDistSq >= detectDist * detectDist)
+                ? -1.0
+                : Math.sqrt(centerDistSq) - AHEAD_CENTER_OFFSET;
         aheadDistCacheTicks = AHEAD_DIST_REFRESH_TICKS;
         return aheadDistCache;
     }
@@ -704,29 +974,26 @@ public final class AutoDriveController {
             predecessorRefCacheTicks = 0;
             return null;
         }
-
         if (predecessorTailCache != null && !predecessorTailCache.isDead && predecessorRefCacheTicks > 0) {
             predecessorRefCacheTicks--;
             return predecessorTailCache;
         }
-
         if (FormationManager.getInstance() == null) {
             predecessorTailCache = null;
             predecessorRefCacheTicks = 0;
             return null;
         }
-
         Formation predecessor = FormationManager.getInstance().getFormation(predecessorFormationId);
         if (predecessor == null || predecessor.entries == null || predecessor.entries.length == 0) {
             predecessorTailCache = null;
             predecessorRefCacheTicks = 0;
             return null;
         }
-
         EntityTrainBase tail = null;
         for (int i = predecessor.entries.length - 1; i >= 0; i--) {
             FormationEntry e = predecessor.entries[i];
-            if (e == null || e.train == null || e.train.isDead) continue;
+            if (e == null || e.train == null || e.train.isDead)
+                continue;
             tail = e.train;
             break;
         }
@@ -735,22 +1002,18 @@ public final class AutoDriveController {
         return predecessorTailCache;
     }
 
-    private static double distSq2D(EntityTrainBase a, EntityTrainBase b) {
-        double dx = b.posX - a.posX;
-        double dz = b.posZ - a.posZ;
-        return dx * dx + dz * dz;
-    }
-
     private List<PathPoint> buildAheadPathOnRail(World world, EntityTrainBase lead, StationSnapshot targetSnap) {
-        if (world == null || lead == null) return null;
+        if (world == null || lead == null)
+            return null;
         int minY = (int) lead.posY - 4;
-        TileEntityLargeRailBase startRail =
-                TileEntityLargeRailBase.getRailFromCoordinates(world, lead.posX, lead.posY + 1.0, lead.posZ, minY);
-        if (startRail == null) return null;
+        TileEntityLargeRailBase startRail = TileEntityLargeRailBase.getRailFromCoordinates(
+                world, lead.posX, lead.posY + 1.0, lead.posZ, minY);
+        if (startRail == null)
+            return null;
         RailMap map = startRail.getRailMap(null);
-        if (map == null) return null;
-        double hintX;
-        double hintZ;
+        if (map == null)
+            return null;
+        double hintX, hintZ;
         if (targetSnap != null) {
             double vx = targetSnap.x - lead.posX;
             double vz = targetSnap.z - lead.posZ;
@@ -771,19 +1034,15 @@ public final class AutoDriveController {
         List<PathPoint> points = new ArrayList<>();
         points.add(new PathPoint(lead.posX, lead.posZ, 0.0));
         double total = 0.0;
-        double curX = lead.posX;
-        double curY = lead.posY;
-        double curZ = lead.posZ;
-        RailMap prevMap = null;
-        RailMap current = map;
-        for (int depth = 0; depth < AHEAD_PATH_MAX_DEPTH
-                && current != null
-                && total < COL_WARN_DIST
-                && points.size() < AHEAD_PATH_MAX_POINTS; depth++) {
+        double curX = lead.posX, curY = lead.posY, curZ = lead.posZ;
+        RailMap prevMap = null, current = map;
+        for (int depth = 0; depth < AHEAD_PATH_MAX_DEPTH && current != null
+                && total < COL_WARN_DIST && points.size() < AHEAD_PATH_MAX_POINTS; depth++) {
             int split = calcRailSplit(current);
             int idx = current.getNearlestPoint(split, curX, curZ);
             int step = pickForwardStep(current, split, idx, hintX, hintZ);
-            if (step == 0) break;
+            if (step == 0)
+                break;
             boolean reachedEdge = false;
             int i = idx;
             while (total < COL_WARN_DIST && points.size() < AHEAD_PATH_MAX_POINTS) {
@@ -794,13 +1053,14 @@ public final class AutoDriveController {
                 }
                 double[] p0 = current.getRailPos(split, i);
                 double[] p1 = current.getRailPos(split, ni);
-                double x0 = p0[1], z0 = p0[0];
-                double x1 = p1[1], z1 = p1[0];
+                double x0 = p0[1], z0 = p0[0], x1 = p1[1], z1 = p1[0];
                 double segLen = distXZ(x0, z0, x1, z1);
                 i = ni;
-                if (segLen < TANGENT_MIN_NORM) continue;
+                if (segLen < TANGENT_MIN_NORM)
+                    continue;
                 total += segLen;
-                if (total > COL_WARN_DIST) break;
+                if (total > COL_WARN_DIST)
+                    break;
                 hintX = (x1 - x0) / segLen;
                 hintZ = (z1 - z0) / segLen;
                 curX = x1;
@@ -808,7 +1068,8 @@ public final class AutoDriveController {
                 curY = current.getRailHeight(split, ni);
                 points.add(new PathPoint(x1, z1, total));
             }
-            if (!reachedEdge) break;
+            if (!reachedEdge)
+                break;
             RailMap next = findConnectedRailMap(world, curX, curY, curZ, current, prevMap, hintX, hintZ);
             prevMap = current;
             current = next;
@@ -816,13 +1077,9 @@ public final class AutoDriveController {
         return points;
     }
 
-    private RailMap findConnectedRailMap(
-            World world, double x, double y, double z,
-            RailMap current, RailMap previous,
-            double hintX, double hintZ) {
-        int bx = (int) Math.floor(x);
-        int by = (int) Math.floor(y);
-        int bz = (int) Math.floor(z);
+    private RailMap findConnectedRailMap(World world, double x, double y, double z,
+            RailMap current, RailMap previous, double hintX, double hintZ) {
+        int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
         RailMap best = null;
         double bestDot = NEXT_MAP_MIN_DOT;
         for (int dy = 1; dy >= -2; dy--) {
@@ -830,21 +1087,22 @@ public final class AutoDriveController {
                 for (int dz = -AHEAD_NEXT_SEARCH; dz <= AHEAD_NEXT_SEARCH; dz++) {
                     RailMap candidate = TileEntityLargeRailBase.getRailMapFromCoordinates(
                             world, null, bx + dx + 0.5, by + dy, bz + dz + 0.5);
-                    if (candidate == null) continue;
-                    if (candidate.equals(current)) continue;
-                    if (candidate.equals(previous)) continue;
+                    if (candidate == null || candidate.equals(current) || candidate.equals(previous))
+                        continue;
                     int split = calcRailSplit(candidate);
                     int idx = candidate.getNearlestPoint(split, x, z);
                     int step = pickForwardStep(candidate, split, idx, hintX, hintZ);
-                    if (step == 0) continue;
+                    if (step == 0)
+                        continue;
                     int ni = idx + step;
-                    if (ni < 0 || ni > split) continue;
+                    if (ni < 0 || ni > split)
+                        continue;
                     double[] p0 = candidate.getRailPos(split, idx);
                     double[] p1 = candidate.getRailPos(split, ni);
-                    double vx = p1[1] - p0[1];
-                    double vz = p1[0] - p0[0];
+                    double vx = p1[1] - p0[1], vz = p1[0] - p0[0];
                     double n = Math.sqrt(vx * vx + vz * vz);
-                    if (n < TANGENT_MIN_NORM) continue;
+                    if (n < TANGENT_MIN_NORM)
+                        continue;
                     double dot = (vx / n) * hintX + (vz / n) * hintZ;
                     if (dot > bestDot) {
                         bestDot = dot;
@@ -857,10 +1115,11 @@ public final class AutoDriveController {
     }
 
     private EntityTrainBase getLeadTrain(Formation f) {
-        if (f == null || f.entries == null) return null;
-        for (FormationEntry e : f.entries) {
-            if (e != null && e.train != null) return e.train;
-        }
+        if (f == null || f.entries == null)
+            return null;
+        for (FormationEntry e : f.entries)
+            if (e != null && e.train != null)
+                return e.train;
         return null;
     }
 
@@ -873,7 +1132,9 @@ public final class AutoDriveController {
     }
 
     private void killFormation(Formation f) {
-        for (FormationEntry e : f.entries) if (e.train != null) e.train.setDead();
+        for (FormationEntry e : f.entries)
+            if (e.train != null)
+                e.train.setDead();
     }
 
     public long getFormationId() {
@@ -893,7 +1154,8 @@ public final class AutoDriveController {
     }
 
     public void setPredecessorFormationId(long predecessorFormationId) {
-        if (this.predecessorFormationId == predecessorFormationId) return;
+        if (this.predecessorFormationId == predecessorFormationId)
+            return;
         this.predecessorFormationId = predecessorFormationId;
         this.predecessorTailCache = null;
         this.predecessorRefCacheTicks = 0;
@@ -901,10 +1163,33 @@ public final class AutoDriveController {
         this.aheadDistCache = -1.0;
     }
 
+    public double getLeadX(World world) {
+        Formation f = FormationManager.getInstance().getFormation(formationId);
+        EntityTrainBase lead = getLeadTrain(f);
+        return lead != null ? lead.posX : Double.MIN_VALUE;
+    }
+
+    public double getLeadZ(World world) {
+        Formation f = FormationManager.getInstance().getFormation(formationId);
+        EntityTrainBase lead = getLeadTrain(f);
+        return lead != null ? lead.posZ : Double.MIN_VALUE;
+    }
+
+    public void onSignalSpeedMapReceived(int[] speedMap) {
+        this.signalSpeedMap = speedMap;
+    }
+
+    private int resolveSpeedKmh(jp.apple.arad.section.SectionSlot slot, int signalLevel) {
+        if (signalSpeedMap != null
+                && signalLevel >= 0
+                && signalLevel < signalSpeedMap.length) {
+            return signalSpeedMap[signalLevel];
+        }
+        return slot.getSpeedKmh(signalLevel);
+    }
+
     private static final class PathPoint {
-        final double x;
-        final double z;
-        final double s;
+        final double x, z, s;
 
         PathPoint(double x, double z, double s) {
             this.x = x;
@@ -914,8 +1199,7 @@ public final class AutoDriveController {
     }
 
     private static final class PathProjection {
-        final double longitudinal;
-        final double lateral;
+        final double longitudinal, lateral;
 
         PathProjection(double longitudinal, double lateral) {
             this.longitudinal = longitudinal;

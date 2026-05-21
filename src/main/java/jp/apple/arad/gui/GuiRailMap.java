@@ -70,10 +70,11 @@ public final class GuiRailMap extends GuiScreen {
     private String hoveredCoreKey = null;
 
     private static double pointToSegmentDist(double px, double py,
-                                             double x0, double y0, double x1, double y1) {
+            double x0, double y0, double x1, double y1) {
         double dx = x1 - x0, dy = y1 - y0;
         double lenSq = dx * dx + dy * dy;
-        if (lenSq < 1e-6) return Math.hypot(px - x0, py - y0);
+        if (lenSq < 1e-6)
+            return Math.hypot(px - x0, py - y0);
         double t = ((px - x0) * dx + (py - y0) * dy) / lenSq;
         t = Math.max(0, Math.min(1, t));
         return Math.hypot(px - (x0 + t * dx), py - (y0 + t * dy));
@@ -117,7 +118,7 @@ public final class GuiRailMap extends GuiScreen {
                 b = x;
                 break;
         }
-        return new float[]{r + m, g + m, b + m};
+        return new float[] { r + m, g + m, b + m };
     }
 
     @Override
@@ -139,7 +140,8 @@ public final class GuiRailMap extends GuiScreen {
             int dx = width - PANEL_W + 5;
             int dy = 160;
             buttonList.add(new GuiButton(BTN_EDIT_SAVE, dx, dy, (PANEL_W - 15) / 2, 20, "保存"));
-            buttonList.add(new GuiButton(BTN_EDIT_CANCEL, dx + (PANEL_W - 15) / 2 + 5, dy, (PANEL_W - 15) / 2, 20, "閉じる"));
+            buttonList.add(
+                    new GuiButton(BTN_EDIT_CANCEL, dx + (PANEL_W - 15) / 2 + 5, dy, (PANEL_W - 15) / 2, 20, "閉じる"));
             if (editCountField == null) {
                 editCountField = new GuiTextField(10, fontRenderer,
                         width - PANEL_W + 5, 135, PANEL_W - 10, 18);
@@ -203,7 +205,6 @@ public final class GuiRailMap extends GuiScreen {
 
         int mapW = width - PANEL_W;
 
-
         if (speedEditMode && !speedInputOpen) {
             updateHoveredRail(mouseX, mouseY, mapW, rails);
         } else {
@@ -231,9 +232,12 @@ public final class GuiRailMap extends GuiScreen {
         drawString(fontRenderer, coord, 6, height - 11, TEXT_DIM);
         drawScaleBar(mapW);
 
-        if (routeCreateMode && routeNameField != null) routeNameField.drawTextBox();
-        if (editDialogOpen && editCountField != null) editCountField.drawTextBox();
-        if (speedInputOpen && speedInputField != null) speedInputField.drawTextBox();
+        if (routeCreateMode && routeNameField != null)
+            routeNameField.drawTextBox();
+        if (editDialogOpen && editCountField != null)
+            editCountField.drawTextBox();
+        if (speedInputOpen && speedInputField != null)
+            speedInputField.drawTextBox();
 
         super.drawScreen(mouseX, mouseY, partial);
     }
@@ -269,16 +273,19 @@ public final class GuiRailMap extends GuiScreen {
             int kmh = entry.getValue();
 
             String[] parts = key.split(":");
-            if (parts.length != 4) continue;
+            if (parts.length != 4)
+                continue;
             try {
                 int kDim = Integer.parseInt(parts[0]);
-                if (kDim != dim) continue;
+                if (kDim != dim)
+                    continue;
                 double wx = Double.parseDouble(parts[1]) + 0.5;
                 double wz = Double.parseDouble(parts[3]) + 0.5;
 
                 int sx = toSX(wx);
                 int sz = toSZ(wz);
-                if (sx < 0 || sx >= mapW || sz < 0 || sz >= height) continue;
+                if (sx < 0 || sx >= mapW || sz < 0 || sz >= height)
+                    continue;
 
                 drawSpeedSign(sx, sz - 14, kmh);
             } catch (NumberFormatException ignored) {
@@ -314,7 +321,8 @@ public final class GuiRailMap extends GuiScreen {
         drawCenteredString(fontRenderer, "§l制限速度を設定 (km/h)", width / 2, dy + 8, 0xFFFFFFFF);
         drawCenteredString(fontRenderer, "§70 で制限解除", width / 2, dy + 20, TEXT_DIM);
 
-        if (speedInputField != null) speedInputField.drawTextBox();
+        if (speedInputField != null)
+            speedInputField.drawTextBox();
     }
 
     private void drawGrid(int mapW) {
@@ -323,7 +331,8 @@ public final class GuiRailMap extends GuiScreen {
         double gz0 = Math.floor(toWorldZ(0) / gs) * gs;
         for (double gx = gx0; gx <= toWorldX(mapW); gx += gs) {
             int sx = toSX(gx);
-            if (sx >= mapW) continue;
+            if (sx >= mapW)
+                continue;
             drawVerticalLine(sx, 0, height, GRID);
             if (gx % 64 == 0 && sx > 4 && sx < mapW - 24)
                 drawString(fontRenderer, (int) gx + "", sx + 2, 2, 0x338899CC);
@@ -342,7 +351,6 @@ public final class GuiRailMap extends GuiScreen {
         GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GL11.glEnable(GL11.GL_LINE_SMOOTH);
 
-
         GL11.glLineWidth(speedEditMode ? 2.5f : 1.8f);
         GL11.glBegin(GL11.GL_LINES);
         if (speedEditMode)
@@ -353,18 +361,19 @@ public final class GuiRailMap extends GuiScreen {
 
             if (speedEditMode && hoveredCoreKey != null) {
                 String ck = seg.coreX + ":" + seg.coreY + ":" + seg.coreZ;
-                if (hoveredCoreKey.equals(ck)) continue;
+                if (hoveredCoreKey.equals(ck))
+                    continue;
             }
             for (int i = 0; i < seg.size() - 1; i++) {
                 int sx0 = toSX(seg.xPoints[i]), sz0 = toSZ(seg.zPoints[i]);
                 int sx1 = toSX(seg.xPoints[i + 1]), sz1 = toSZ(seg.zPoints[i + 1]);
-                if (offScreen(sx0, sz0, mapW) && offScreen(sx1, sz1, mapW)) continue;
+                if (offScreen(sx0, sz0, mapW) && offScreen(sx1, sz1, mapW))
+                    continue;
                 GL11.glVertex2i(sx0, sz0);
                 GL11.glVertex2i(sx1, sz1);
             }
         }
         GL11.glEnd();
-
 
         if (speedEditMode && hoveredCoreKey != null) {
             GL11.glLineWidth(5.0f);
@@ -372,11 +381,13 @@ public final class GuiRailMap extends GuiScreen {
             GL11.glColor4f(1f, 1f, 1f, 1f);
             for (CachedRail seg : rails) {
                 String ck = seg.coreX + ":" + seg.coreY + ":" + seg.coreZ;
-                if (!hoveredCoreKey.equals(ck)) continue;
+                if (!hoveredCoreKey.equals(ck))
+                    continue;
                 for (int i = 0; i < seg.size() - 1; i++) {
                     int sx0 = toSX(seg.xPoints[i]), sz0 = toSZ(seg.zPoints[i]);
                     int sx1 = toSX(seg.xPoints[i + 1]), sz1 = toSZ(seg.zPoints[i + 1]);
-                    if (offScreen(sx0, sz0, mapW) && offScreen(sx1, sz1, mapW)) continue;
+                    if (offScreen(sx0, sz0, mapW) && offScreen(sx1, sz1, mapW))
+                        continue;
                     GL11.glVertex2i(sx0, sz0);
                     GL11.glVertex2i(sx1, sz1);
                 }
@@ -390,8 +401,9 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void drawRouteLines(List<RouteSnapshot> routes,
-                                List<StationSnapshot> stations, int mapW) {
-        if (routes.isEmpty()) return;
+            List<StationSnapshot> stations, int mapW) {
+        if (routes.isEmpty())
+            return;
         GlStateManager.disableTexture2D();
         GL11.glEnable(GL11.GL_LINE_SMOOTH);
         GL11.glLineWidth(2.2f);
@@ -403,9 +415,11 @@ public final class GuiRailMap extends GuiScreen {
             GL11.glColor4f(rgb[0], rgb[1], rgb[2], 0.7f);
             for (String sid : route.stationIds) {
                 StationSnapshot st = findStation(sid, stations);
-                if (st == null) continue;
+                if (st == null)
+                    continue;
                 int sx = toSX(st.x), sz = toSZ(st.z);
-                if (sx > mapW) continue;
+                if (sx > mapW)
+                    continue;
                 GL11.glVertex2i(sx, sz);
             }
             GL11.glEnd();
@@ -416,7 +430,8 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void drawPendingRoutePreview(List<StationSnapshot> stations, int mapW) {
-        if (!routeCreateMode || pendingIds.size() < 2) return;
+        if (!routeCreateMode || pendingIds.size() < 2)
+            return;
         GlStateManager.disableTexture2D();
         GL11.glLineWidth(2.5f);
         GL11.glEnable(GL11.GL_LINE_SMOOTH);
@@ -424,7 +439,8 @@ public final class GuiRailMap extends GuiScreen {
         GL11.glColor4f(1f, 0.85f, 0.2f, 0.9f);
         for (String sid : pendingIds) {
             StationSnapshot st = findStation(sid, stations);
-            if (st == null) continue;
+            if (st == null)
+                continue;
             GL11.glVertex2i(toSX(st.x), toSZ(st.z));
         }
         GL11.glEnd();
@@ -434,11 +450,12 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void drawStations(List<StationSnapshot> stations,
-                              List<RouteSnapshot> routes,
-                              int mouseX, int mouseY, int mapW) {
+            List<RouteSnapshot> routes,
+            int mouseX, int mouseY, int mapW) {
         for (StationSnapshot st : stations) {
             int sx = toSX(st.x), sz = toSZ(st.z);
-            if (sx >= mapW || offScreen(sx, sz, mapW)) continue;
+            if (sx >= mapW || offScreen(sx, sz, mapW))
+                continue;
 
             boolean isPending = pendingIds.contains(st.id);
             boolean isHovered = routeCreateMode
@@ -482,8 +499,8 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void drawRightPanel(List<RouteSnapshot> routes,
-                                List<StationSnapshot> stations,
-                                int mouseX, int mouseY, int mapW) {
+            List<StationSnapshot> stations,
+            int mouseX, int mouseY, int mapW) {
         drawRect(mapW, 0, width, height, 0xFF0A1225);
         drawRect(mapW, 0, mapW + 1, height, 0xFF2A3F70);
 
@@ -559,8 +576,8 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void drawInfoPanel(List<FormationSnapshot> formations,
-                               List<StationSnapshot> stations,
-                               List<RouteSnapshot> routes) {
+            List<StationSnapshot> stations,
+            List<RouteSnapshot> routes) {
         drawRect(6, 6, 190, 58, PANEL_BG);
         drawRect(6, 6, 190, 7, BORDER);
         long alive = formations.stream().filter(f -> !f.cars.isEmpty()).count();
@@ -573,14 +590,16 @@ public final class GuiRailMap extends GuiScreen {
 
     private void drawFormations(List<FormationSnapshot> formations, int mapW) {
         for (FormationSnapshot f : formations) {
-            if (f.cars.isEmpty()) continue;
+            if (f.cars.isEmpty())
+                continue;
             float[] col = speedColor(f.speed);
             if (f.cars.size() > 1) {
                 GlStateManager.disableTexture2D();
                 GL11.glLineWidth(2.5f);
                 GL11.glBegin(GL11.GL_LINE_STRIP);
                 GL11.glColor4f(col[0], col[1], col[2], 0.5f);
-                for (float[] car : f.cars) GL11.glVertex2i(toSX(car[0]), toSZ(car[1]));
+                for (float[] car : f.cars)
+                    GL11.glVertex2i(toSX(car[0]), toSZ(car[1]));
                 GL11.glEnd();
                 GL11.glLineWidth(1f);
                 GlStateManager.enableTexture2D();
@@ -588,7 +607,8 @@ public final class GuiRailMap extends GuiScreen {
             for (int i = 0; i < f.cars.size(); i++) {
                 float[] car = f.cars.get(i);
                 int sx = toSX(car[0]), sz = toSZ(car[1]);
-                if (offScreen(sx, sz, mapW)) continue;
+                if (offScreen(sx, sz, mapW))
+                    continue;
                 drawCarMarker(sx, sz, car[2], col, i == 0);
             }
             float[] front = f.cars.get(0);
@@ -631,13 +651,16 @@ public final class GuiRailMap extends GuiScreen {
         String myName = (mc.player != null) ? mc.player.getName() : null;
         for (PlayerSnapshot p : players) {
             int sx = toSX(p.x), sz = toSZ(p.z);
-            if (offScreen(sx, sz, mapW)) continue;
+            if (offScreen(sx, sz, mapW))
+                continue;
             boolean isMe = p.name.equals(myName);
             GlStateManager.disableTexture2D();
             GL11.glPointSize(isMe ? 10f : 6f);
             GL11.glBegin(GL11.GL_POINTS);
-            if (isMe) GL11.glColor4f(0.25f, 0.85f, 1f, 1f);
-            else GL11.glColor4f(1f, 1f, 0.4f, 0.9f);
+            if (isMe)
+                GL11.glColor4f(0.25f, 0.85f, 1f, 1f);
+            else
+                GL11.glColor4f(1f, 1f, 0.4f, 0.9f);
             GL11.glVertex2i(sx, sz);
             GL11.glEnd();
             GL11.glPointSize(1f);
@@ -718,11 +741,13 @@ public final class GuiRailMap extends GuiScreen {
         editRouteName = route.name;
         editCountField = null;
         rebuildButtons();
-        if (editCountField != null) editCountField.setText(String.valueOf(route.trainCount));
+        if (editCountField != null)
+            editCountField.setText(String.valueOf(route.trainCount));
     }
 
     private void saveEditDialog() {
-        if (editRouteId == null || editCountField == null) return;
+        if (editRouteId == null || editCountField == null)
+            return;
         try {
             int count = Integer.parseInt(editCountField.getText().trim());
             AradPacketHandler.CHANNEL.sendToServer(
@@ -736,7 +761,8 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void saveSpeedInput() {
-        if (speedInputKey == null || speedInputField == null) return;
+        if (speedInputKey == null || speedInputField == null)
+            return;
         try {
             int kmh = Integer.parseInt(speedInputField.getText().trim());
             AradPacketHandler.CHANNEL.sendToServer(PacketSpeedLimit.change(speedInputKey, kmh));
@@ -749,9 +775,11 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void confirmRoute() {
-        if (pendingIds.size() < 2) return;
+        if (pendingIds.size() < 2)
+            return;
         String name = (routeNameField != null && !routeNameField.getText().trim().isEmpty())
-                ? routeNameField.getText().trim() : "新路線";
+                ? routeNameField.getText().trim()
+                : "新路線";
         AradPacketHandler.CHANNEL.sendToServer(
                 new PacketConfirmRoute(name, new ArrayList<>(pendingIds)));
         routeCreateMode = false;
@@ -761,11 +789,13 @@ public final class GuiRailMap extends GuiScreen {
     }
 
     private void handleSpeedClick(int mx, int my, boolean rightClick, int mapW) {
-        if (mx >= mapW) return;
-        if (speedInputOpen) return;
+        if (mx >= mapW)
+            return;
+        if (speedInputOpen)
+            return;
 
-
-        if (hoveredCoreKey == null) return;
+        if (hoveredCoreKey == null)
+            return;
 
         int dim = mc.world != null ? mc.world.provider.getDimension() : 0;
 
@@ -792,7 +822,8 @@ public final class GuiRailMap extends GuiScreen {
                 int old = routeListScroll;
                 routeListScroll += (scroll > 0) ? -1 : 1;
                 clampRouteListScroll();
-                if (old != routeListScroll) rebuildButtons();
+                if (old != routeListScroll)
+                    rebuildButtons();
                 return;
             }
             scale = Math.max(0.15, Math.min(20.0, scale * (scroll > 0 ? 1.25 : 0.8)));
@@ -801,9 +832,12 @@ public final class GuiRailMap extends GuiScreen {
 
     @Override
     protected void mouseClicked(int mx, int my, int btn) throws IOException {
-        if (routeCreateMode && routeNameField != null) routeNameField.mouseClicked(mx, my, btn);
-        if (editDialogOpen && editCountField != null) editCountField.mouseClicked(mx, my, btn);
-        if (speedInputOpen && speedInputField != null) speedInputField.mouseClicked(mx, my, btn);
+        if (routeCreateMode && routeNameField != null)
+            routeNameField.mouseClicked(mx, my, btn);
+        if (editDialogOpen && editCountField != null)
+            editCountField.mouseClicked(mx, my, btn);
+        if (speedInputOpen && speedInputField != null)
+            speedInputField.mouseClicked(mx, my, btn);
 
         int mapW = width - PANEL_W;
 
@@ -817,8 +851,10 @@ public final class GuiRailMap extends GuiScreen {
             for (StationSnapshot st : stations) {
                 int sx = toSX(st.x), sz = toSZ(st.z);
                 if (Math.abs(mx - sx) <= STATION_HIT_R && Math.abs(my - sz) <= STATION_HIT_R) {
-                    if (btn == 0 && !pendingIds.contains(st.id)) pendingIds.add(st.id);
-                    else if (btn == 1) pendingIds.remove(st.id);
+                    if (btn == 0 && !pendingIds.contains(st.id))
+                        pendingIds.add(st.id);
+                    else if (btn == 1)
+                        pendingIds.remove(st.id);
                     return;
                 }
             }
@@ -835,7 +871,8 @@ public final class GuiRailMap extends GuiScreen {
     @Override
     protected void mouseReleased(int mx, int my, int state) {
         super.mouseReleased(mx, my, state);
-        if (state == 0) dragging = false;
+        if (state == 0)
+            dragging = false;
     }
 
     @Override
@@ -886,15 +923,19 @@ public final class GuiRailMap extends GuiScreen {
 
     @Override
     public void updateScreen() {
-        if (routeCreateMode && routeNameField != null) routeNameField.updateCursorCounter();
-        if (editDialogOpen && editCountField != null) editCountField.updateCursorCounter();
-        if (speedInputOpen && speedInputField != null) speedInputField.updateCursorCounter();
+        if (routeCreateMode && routeNameField != null)
+            routeNameField.updateCursorCounter();
+        if (editDialogOpen && editCountField != null)
+            editCountField.updateCursorCounter();
+        if (speedInputOpen && speedInputField != null)
+            speedInputField.updateCursorCounter();
 
         int currentCount = MapData.INSTANCE.getRoutes().size();
         if (currentCount != lastRouteCount) {
             lastRouteCount = currentCount;
             clampRouteListScroll();
-            if (!editDialogOpen && !speedInputOpen) rebuildButtons();
+            if (!editDialogOpen && !speedInputOpen)
+                rebuildButtons();
         }
     }
 
@@ -925,20 +966,26 @@ public final class GuiRailMap extends GuiScreen {
 
     private float[] speedColor(float spd) {
         float kmh = Math.abs(spd) * 72f;
-        if (kmh < 1f) return new float[]{0.6f, 0.6f, 0.6f};
-        if (kmh < 75f) return new float[]{1f, 1f, 0f};
-        return new float[]{1f, 0.2f, 0.2f};
+        if (kmh < 1f)
+            return new float[] { 0.6f, 0.6f, 0.6f };
+        if (kmh < 75f)
+            return new float[] { 1f, 1f, 0f };
+        return new float[] { 1f, 0.2f, 0.2f };
     }
 
     private int speedTextColor(float spd) {
         float kmh = Math.abs(spd) * 72f;
-        if (kmh < 1f) return 0xFFAAAAAA;
-        if (kmh < 75f) return 0xFFFFDD44;
+        if (kmh < 1f)
+            return 0xFFAAAAAA;
+        if (kmh < 75f)
+            return 0xFFFFDD44;
         return 0xFFFF5555;
     }
 
     private StationSnapshot findStation(String id, List<StationSnapshot> list) {
-        for (StationSnapshot s : list) if (id.equals(s.id)) return s;
+        for (StationSnapshot s : list)
+            if (id.equals(s.id))
+                return s;
         return null;
     }
 
@@ -953,7 +1000,9 @@ public final class GuiRailMap extends GuiScreen {
     private void clampRouteListScroll() {
         int total = MapData.INSTANCE.getRoutes().size();
         int maxScroll = Math.max(0, total - getVisibleRouteRows());
-        if (routeListScroll < 0) routeListScroll = 0;
-        if (routeListScroll > maxScroll) routeListScroll = maxScroll;
+        if (routeListScroll < 0)
+            routeListScroll = 0;
+        if (routeListScroll > maxScroll)
+            routeListScroll = maxScroll;
     }
 }

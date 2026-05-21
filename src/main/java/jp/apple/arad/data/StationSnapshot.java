@@ -4,9 +4,9 @@ public final class StationSnapshot {
 
     public final String id;
     public final String name;
-    public final float  x;
-    public final float  z;
-    public final int    dim;
+    public final float x;
+    public final float z;
+    public final int dim;
     public final boolean doorLeft;
     public final boolean doorRight;
     public final boolean spawnReversed;
@@ -17,12 +17,12 @@ public final class StationSnapshot {
     }
 
     public StationSnapshot(String id, String name, float x, float z, int dim,
-                           boolean doorLeft, boolean doorRight, boolean spawnReversed, int dwellTicks) {
-        this.id   = id;
+            boolean doorLeft, boolean doorRight, boolean spawnReversed, int dwellTicks) {
+        this.id = id;
         this.name = name;
-        this.x    = x;
-        this.z    = z;
-        this.dim  = dim;
+        this.x = x;
+        this.z = z;
+        this.dim = dim;
         this.doorLeft = doorLeft;
         this.doorRight = doorRight;
         this.spawnReversed = spawnReversed;
@@ -30,9 +30,12 @@ public final class StationSnapshot {
     }
 
     public byte getDoorData() {
-        if (doorLeft && doorRight) return 3;
-        if (doorRight) return 1;
-        if (doorLeft) return 2;
+        if (doorLeft && doorRight)
+            return 3;
+        if (doorRight)
+            return 1;
+        if (doorLeft)
+            return 2;
         return 0;
     }
 }

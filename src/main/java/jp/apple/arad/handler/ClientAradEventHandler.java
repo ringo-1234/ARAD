@@ -10,13 +10,15 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 public final class ClientAradEventHandler {
     @SubscribeEvent
     public void onWorldLoad(WorldEvent.Load event) {
-        if (!event.getWorld().isRemote) return;
+        if (!event.getWorld().isRemote)
+            return;
         MapData.INSTANCE.onWorldJoin();
     }
 
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
-        if (!event.getWorld().isRemote) return;
+        if (!event.getWorld().isRemote)
+            return;
         MapData.INSTANCE.onWorldLeave();
     }
 }

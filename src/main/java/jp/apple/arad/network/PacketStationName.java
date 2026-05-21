@@ -63,7 +63,8 @@ public final class PacketStationName implements IMessage {
 
             world.addScheduledTask(() -> {
                 TileEntity te = world.getTileEntity(new BlockPos(msg.x, msg.y, msg.z));
-                if (!(te instanceof TileEntityStation)) return;
+                if (!(te instanceof TileEntityStation))
+                    return;
 
                 TileEntityStation station = (TileEntityStation) te;
                 station.setStationName(msg.name);
@@ -72,8 +73,7 @@ public final class PacketStationName implements IMessage {
                 List<StationSnapshot> stations = StationRegistry.INSTANCE.toSnapshots();
                 List<RouteSnapshot> routes = RouteManager.get(world).toSnapshots();
                 AradPacketHandler.CHANNEL.sendToAll(
-                        new PacketStationRouteData(stations, routes)
-                );
+                        new PacketStationRouteData(stations, routes));
             });
             return null;
         }

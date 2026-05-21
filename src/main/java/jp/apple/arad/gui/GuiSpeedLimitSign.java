@@ -147,5 +147,6 @@ public class GuiSpeedLimitSign extends GuiContainer {
     }
 
     @Override
-    protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {}
+    protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
+    }
 }
